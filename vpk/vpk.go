@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
+	"iter"
+	"strings"
 )
 
 var (
@@ -130,4 +133,51 @@ func (f *File) read(tree []byte, data []byte) (rem []byte, err error) {
 		return nil, err
 	}
 	return tree, nil
+}
+
+type Entry struct {
+	Ext  string
+	Path string
+	File
+}
+
+func (e Entry) AbsPath() string {
+	return fmt.Sprintf("%s/%s/%s", e.Ext, e.Path, e.Name)
+}
+
+func (tree Tree) List() iter.Seq[Entry] {
+	return func(yield func(Entry) bool) {
+		for _, ext := range tree {
+			for _, dir := range ext.Dirs {
+				for _, e := range dir.Entries {
+					if !yield(Entry{ext.Name, dir.Path, e}) {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+func (tree Tree) Find(path string) (entry Entry, ok bool) {
+	e := strings.Split(path, "/")
+	if len(e) < 3 {
+		return
+	}
+	for _, ext := range tree {
+		if ext.Name == e[0] {
+			path = strings.Join(e[1:len(e)-1], "/")
+			for _, dir := range ext.Dirs {
+				if dir.Path == path {
+					name := e[len(e)-1]
+					for _, e := range dir.Entries {
+						if e.Name == name {
+							return Entry{ext.Name, dir.Path, e}, true
+						}
+					}
+				}
+			}
+		}
+	}
+	return
 }
