@@ -77,7 +77,7 @@ func parse2(vpk []byte) (Tree, error) {
 	}
 	md5SecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
 	if md5SecSz != 48 {
-		return nil, ErrInvalidDataSec
+		return nil, ErrInvalidMd5Sec
 	}
 	sigSecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
 	if sigSecSz != 0 {
