@@ -2,6 +2,7 @@ package vpk
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,10 +14,11 @@ import (
 var (
 	ErrNotVPK         = errors.New("not a VPK file")
 	ErrUnsupportedVer = errors.New("unsupported VPK version")
-	ErrUnexpectedArch = errors.New("unexpected archive section")
+	ErrUnexpectedArch = errors.New("unexpected archive MD5 section")
 	ErrUnexpectedSign = errors.New("unexpected signature section")
 	ErrUnexpectedPre  = errors.New("unexpected preloaded data")
 	ErrInvalidDataSec = errors.New("data size mismatch")
+	ErrInvalidMd5Sec  = errors.New("checksum section size mismatch")
 	ErrFileCorrupted  = errors.New("file corrupted")
 )
 
@@ -48,11 +50,11 @@ func (f *File) SetData(data []byte) {
 }
 
 func Parse(vpk []byte) (Tree, error) {
-	magic, vpk := binary.LittleEndian.Uint32(vpk), vpk[4:]
+	magic := binary.LittleEndian.Uint32(vpk)
 	if magic != 0x55aa1234 {
 		return nil, ErrNotVPK
 	}
-	ver, vpk := binary.LittleEndian.Uint32(vpk), vpk[4:]
+	ver := binary.LittleEndian.Uint32(vpk[4:])
 	switch ver {
 	case 2:
 		return parse2(vpk)
@@ -62,6 +64,11 @@ func Parse(vpk []byte) (Tree, error) {
 }
 
 func parse2(vpk []byte) (Tree, error) {
+	if len(vpk) < 8+20+48 {
+		return nil, ErrFileCorrupted
+	}
+	vpkSum := md5.Sum(vpk[:len(vpk)-16])
+	md5Sec, vpk := vpk[len(vpk)-48:], vpk[8:]
 	treeSz, vpk := binary.LittleEndian.Uint32(vpk), vpk[4:]
 	dataSecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
 	archSecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
@@ -69,6 +76,9 @@ func parse2(vpk []byte) (Tree, error) {
 		return nil, ErrUnexpectedArch
 	}
 	md5SecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
+	if md5SecSz != 48 {
+		return nil, ErrInvalidDataSec
+	}
 	sigSecSz, vpk := int(binary.LittleEndian.Uint32(vpk)), vpk[4:]
 	if sigSecSz != 0 {
 		return nil, ErrUnexpectedSign
@@ -77,6 +87,15 @@ func parse2(vpk []byte) (Tree, error) {
 	data := vpk[treeSz : len(vpk)-archSecSz-md5SecSz-sigSecSz]
 	if len(data) != dataSecSz {
 		return nil, ErrInvalidDataSec
+	}
+	if act, exp := md5.Sum(tree), md5Sec[:16]; !bytes.Equal(act[:], exp) {
+		return nil, ErrFileCorrupted
+	}
+	if act, exp := md5.Sum([]byte{}), md5Sec[16:32]; !bytes.Equal(act[:], exp) {
+		return nil, ErrFileCorrupted
+	}
+	if exp := md5Sec[32:]; !bytes.Equal(vpkSum[:], exp) {
+		return nil, ErrFileCorrupted
 	}
 	return readDir(tree, data)
 }
