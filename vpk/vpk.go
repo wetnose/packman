@@ -49,6 +49,78 @@ func (f *File) SetData(data []byte) {
 	f.data = data
 }
 
+func (t Tree) Pack() []byte {
+	treeSz, dataSz := t.estimateSecSize()
+	// header v2 + tree + data + checksums
+	vpk := make([]byte, 28+treeSz+dataSz+48)
+	hdr := vpk[:0]
+	hdr = binary.LittleEndian.AppendUint32(hdr, 0x55aa1234)
+	hdr = binary.LittleEndian.AppendUint32(hdr, 2) // version
+	hdr = binary.LittleEndian.AppendUint32(hdr, uint32(treeSz))
+	hdr = binary.LittleEndian.AppendUint32(hdr, uint32(dataSz))
+	hdr = binary.LittleEndian.AppendUint32(hdr, 0)  // ArchMD5
+	hdr = binary.LittleEndian.AppendUint32(hdr, 48) // Checksums
+	hdr = binary.LittleEndian.AppendUint32(hdr, 0)  // Signature
+	tree := vpk[28:28]
+	data, off := vpk[28+treeSz:cap(vpk)-48], 0
+	for _, ext := range t {
+		tree = append(tree, ext.Name...)
+		tree = append(tree, 0)
+		for _, dir := range ext.Dirs {
+			tree = append(tree, dir.Path...)
+			tree = append(tree, 0)
+			for _, e := range dir.Entries {
+				tree = append(tree, e.Name...)
+				tree = append(tree, 0)
+				if e.crc == 0 {
+					e.crc = crc32.ChecksumIEEE(e.data)
+				}
+				tree = binary.LittleEndian.AppendUint32(tree, e.crc)
+				tree = binary.LittleEndian.AppendUint16(tree, 0)      // preloaded
+				tree = binary.LittleEndian.AppendUint16(tree, 0x7fff) // arch index
+				tree = binary.LittleEndian.AppendUint32(tree, uint32(off))
+				tree = binary.LittleEndian.AppendUint32(tree, uint32(len(e.data)))
+				tree = binary.LittleEndian.AppendUint16(tree, 0xffff) // terminator
+				copy(data[off:], e.data)
+				off += len(e.data)
+			}
+			tree = append(tree, 0)
+		}
+		tree = append(tree, 0)
+	}
+	tree = append(tree, 0)
+	if len(tree) != treeSz || off != len(data) {
+		panic("illegal state")
+	}
+
+	sum := func(b []byte) []byte {
+		s := md5.Sum(b)
+		return s[:]
+	}
+
+	sums := vpk[len(vpk)-48:]
+	copy(sums, sum(tree))
+	copy(sums[16:], sum([]byte{}))
+	copy(sums[32:], sum(vpk[:len(vpk)-16]))
+	return vpk
+}
+
+func (t Tree) estimateSecSize() (treeSz int, dataSz int) {
+	treeSz++ // final ext.
+	for _, ext := range t {
+		treeSz += len(ext.Name) + 1 + 1 // + end of ext.
+		for _, dir := range ext.Dirs {
+			treeSz += len(dir.Path) + 1 + 1 // + end of dir.
+			for _, e := range dir.Entries {
+				treeSz += len(e.Name) + 1
+				treeSz += e.estimateEntrySize()
+				dataSz += len(e.data)
+			}
+		}
+	}
+	return
+}
+
 func Parse(vpk []byte) (Tree, error) {
 	magic := binary.LittleEndian.Uint32(vpk)
 	if magic != 0x55aa1234 {
@@ -161,6 +233,10 @@ func (f *File) read(tree []byte, data []byte) (rem []byte, err error) {
 		return nil, err
 	}
 	return tree, nil
+}
+
+func (f *File) estimateEntrySize() int {
+	return 18
 }
 
 type Entry struct {

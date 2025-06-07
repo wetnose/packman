@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"slices"
 	"vpk/vpk"
 )
 
@@ -19,7 +19,7 @@ func main() {
 		log.Fatal(err)
 	}
 	c := 0
-	_ = c
+	_, _ = c, tree
 	//for _, ext := range tree {
 	//	fmt.Println(ext.Name)
 	//	for _, dir := range ext.Dirs {
@@ -37,7 +37,28 @@ func main() {
 	//		break
 	//	}
 	//}
-	if e := tree.Find("vmesh_c/models/heroes/earth_spirit/earth_spirit_arms"); e != nil {
-		fmt.Println(e.AbsPath(), len(e.GetData()))
+
+	//if e := tree.Find("vmesh_c/models/heroes/earth_spirit/earth_spirit_arms"); e != nil {
+	//	fmt.Println(e.AbsPath(), len(e.GetData()))
+	//}
+
+	tree = vpk.Tree{}
+
+	hello := vpk.File{Name: "hello"}
+	hello.SetData([]byte("Hello, World!"))
+
+	dir := vpk.Dir{Path: "my/path"}
+	dir.Entries = append(dir.Entries, hello)
+
+	test := vpk.Ext{Name: "test"}
+	test.Dirs = append(test.Dirs, dir)
+	tree = slices.Insert(tree, 0, test)
+
+	if err := os.WriteFile("test.vpk", tree.Pack(), 0660); err != nil {
+		panic(err)
 	}
+
+	//p := tree.Pack()
+	//fmt.Println(len(data), len(p))
+	//fmt.Println(bytes.Equal(data, p))
 }
