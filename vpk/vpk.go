@@ -34,8 +34,17 @@ type Dir struct {
 
 type File struct {
 	Name string
-	Data []byte
+	data []byte
 	crc  uint32
+}
+
+func (f *File) GetData() []byte {
+	return f.data
+}
+
+func (f *File) SetData(data []byte) {
+	f.crc = 0
+	f.data = data
 }
 
 func Parse(vpk []byte) (Tree, error) {
@@ -128,8 +137,8 @@ func (f *File) read(tree []byte, data []byte) (rem []byte, err error) {
 	if preload != 0 {
 		return rem, ErrUnexpectedPre
 	}
-	f.Data = data[offset : offset+length]
-	if f.crc != crc32.ChecksumIEEE(f.Data) {
+	f.data = data[offset : offset+length]
+	if f.crc != crc32.ChecksumIEEE(f.data) {
 		return nil, err
 	}
 	return tree, nil
@@ -159,10 +168,10 @@ func (tree Tree) List() iter.Seq[Entry] {
 	}
 }
 
-func (tree Tree) Find(path string) (entry Entry, ok bool) {
+func (tree Tree) Find(path string) *Entry {
 	e := strings.Split(path, "/")
 	if len(e) < 3 {
-		return
+		return nil
 	}
 	for _, ext := range tree {
 		if ext.Name == e[0] {
@@ -172,12 +181,12 @@ func (tree Tree) Find(path string) (entry Entry, ok bool) {
 					name := e[len(e)-1]
 					for _, e := range dir.Entries {
 						if e.Name == name {
-							return Entry{ext.Name, dir.Path, e}, true
+							return &Entry{ext.Name, dir.Path, e}
 						}
 					}
 				}
 			}
 		}
 	}
-	return
+	return nil
 }

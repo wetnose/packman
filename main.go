@@ -37,7 +37,7 @@ func main() {
 	//		break
 	//	}
 	//}
-	if f, ok := tree.Find("vmesh_c/models/heroes/earth_spirit/earth_spirit_arms"); ok {
-		fmt.Println(f.AbsPath(), len(f.Data))
+	if e := tree.Find("vmesh_c/models/heroes/earth_spirit/earth_spirit_arms"); e != nil {
+		fmt.Println(e.AbsPath(), len(e.GetData()))
 	}
 }
