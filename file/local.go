@@ -100,6 +100,10 @@ func list(dir string) iter.Seq[string] {
 
 func (l local) Store(path string, data []byte) error {
 	path = filepath.Join(string(l), path)
+	dir, _ := filepath.Split(path)
+	if err := os.MkdirAll(dir, 0770); err != nil {
+		return err
+	}
 	return os.WriteFile(path, data, 0660)
 }
 

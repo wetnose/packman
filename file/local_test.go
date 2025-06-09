@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -75,4 +76,14 @@ func TestLocalListFile(t *testing.T) {
 	e, ok := files["."]
 	Check(t, assert.True(t, ok))
 	Check(t, assert.Equal(t, "file111", string(e.GetData())))
+}
+
+func TestStore(t *testing.T) {
+	Check(t, assert.NoError(t, os.RemoveAll("test/tmp")))
+	loc, err := LocalTree("test/tmp")
+	Check(t, assert.NoError(t, err))
+	Check(t, assert.NoError(t, loc.Store("dir/f1.txt", []byte("data"))))
+	data, err := os.ReadFile("test/tmp/dir/f1.txt")
+	Check(t, assert.NoError(t, err))
+	Check(t, assert.Equal(t, "data", string(data)))
 }
