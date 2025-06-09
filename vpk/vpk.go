@@ -5,10 +5,9 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"iter"
-	"strings"
+	"vpk/file"
 )
 
 var (
@@ -20,6 +19,7 @@ var (
 	ErrInvalidDataSec = errors.New("data size mismatch")
 	ErrInvalidMd5Sec  = errors.New("checksum section size mismatch")
 	ErrFileCorrupted  = errors.New("file corrupted")
+	ErrInvalidPath    = errors.New("invalid path")
 )
 
 type Tree []Ext
@@ -49,7 +49,7 @@ func (f *File) SetData(data []byte) {
 	f.data = data
 }
 
-func (t Tree) Pack() []byte {
+func (t *Tree) Pack() []byte {
 	treeSz, dataSz := t.estimateSecSize()
 	// header v2 + tree + data + checksums
 	vpk := make([]byte, 28+treeSz+dataSz+48)
@@ -63,7 +63,7 @@ func (t Tree) Pack() []byte {
 	hdr = binary.LittleEndian.AppendUint32(hdr, 0)  // Signature
 	tree := vpk[28:28]
 	data, off := vpk[28+treeSz:cap(vpk)-48], 0
-	for _, ext := range t {
+	for _, ext := range *t {
 		tree = append(tree, ext.Name...)
 		tree = append(tree, 0)
 		for _, dir := range ext.Dirs {
@@ -105,9 +105,9 @@ func (t Tree) Pack() []byte {
 	return vpk
 }
 
-func (t Tree) estimateSecSize() (treeSz int, dataSz int) {
+func (t *Tree) estimateSecSize() (treeSz int, dataSz int) {
 	treeSz++ // final ext.
-	for _, ext := range t {
+	for _, ext := range *t {
 		treeSz += len(ext.Name) + 1 + 1 // + end of ext.
 		for _, dir := range ext.Dirs {
 			treeSz += len(dir.Path) + 1 + 1 // + end of dir.
@@ -246,12 +246,12 @@ type Entry struct {
 }
 
 func (e Entry) AbsPath() string {
-	return fmt.Sprintf("%s/%s/%s", e.Ext, e.Path, e.Name)
+	return file.Join(e.Ext, e.Path, e.Name)
 }
 
-func (tree Tree) List() iter.Seq[Entry] {
+func (t *Tree) List() iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
-		for _, ext := range tree {
+		for _, ext := range *t {
 			for _, dir := range ext.Dirs {
 				for _, e := range dir.Entries {
 					if !yield(Entry{ext.Name, dir.Path, e}) {
@@ -263,25 +263,81 @@ func (tree Tree) List() iter.Seq[Entry] {
 	}
 }
 
-func (tree Tree) Find(path string) *Entry {
-	e := strings.Split(path, "/")
-	if len(e) < 3 {
-		return nil
+func (t *Tree) FindFirst(path string) *Entry {
+	for _, e := range t.Find(path) {
+		return &e
 	}
-	for _, ext := range tree {
-		if ext.Name == e[0] {
-			path = strings.Join(e[1:len(e)-1], "/")
-			for _, dir := range ext.Dirs {
-				if dir.Path == path {
-					name := e[len(e)-1]
-					for _, e := range dir.Entries {
-						if e.Name == name {
-							return &Entry{ext.Name, dir.Path, e}
+	return nil
+}
+
+func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
+	e, base := file.Split2(path)
+	path, name := file.Split(path)
+	return func(yield func(string, Entry) bool) {
+		if len(e) < 3 {
+			return
+		}
+		for _, ext := range *t {
+			if ext.Name == e {
+				for _, dir := range ext.Dirs {
+					if dir.Path == path {
+						for _, e := range dir.Entries {
+							if e.Name == name && !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+								return
+							}
+						}
+					} else if rel, ok := file.Base(dir.Path, base); ok {
+						for _, e := range dir.Entries {
+							if !yield(file.Join(rel, e.Name), Entry{ext.Name, dir.Path, e}) {
+								return
+							}
 						}
 					}
 				}
 			}
 		}
 	}
+}
+
+func (t *Tree) Store(path string, data []byte) error {
+	base, name := file.Split(path)
+	if base == "" {
+		return ErrInvalidPath
+	}
+	e, path := file.Split2(base)
+	if e == "" || path == "" {
+		return ErrInvalidPath
+	}
+	var ext *Ext
+	for _, ex := range *t {
+		if ex.Name == e {
+			ext = &ex
+			break
+		}
+	}
+	if ext == nil {
+		ext = &Ext{e, nil}
+		*t = append(*t, *ext)
+	}
+	var dir *Dir
+	for _, d := range ext.Dirs {
+		if d.Path == path {
+			dir = &d
+			break
+		}
+	}
+	if dir == nil {
+		dir = &Dir{path, nil}
+		ext.Dirs = append(ext.Dirs, *dir)
+	}
+
+	for _, e := range dir.Entries {
+		if e.Name == name {
+			e.SetData(data)
+			return nil
+		}
+	}
+
+	dir.Entries = append(dir.Entries, File{name, data, 0})
 	return nil
 }

@@ -1,0 +1,6 @@
+dir1/dir11/file111.txt
+dir1/file11.txt
+dir1/file12.txt
+dir2/file22.txt
+file01.txt
+file02.txt
