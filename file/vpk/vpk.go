@@ -7,6 +7,7 @@ import (
 	"errors"
 	"hash/crc32"
 	"iter"
+	"strings"
 	"vpk/file"
 )
 
@@ -271,24 +272,90 @@ func (t *Tree) FindFirst(path string) *Entry {
 }
 
 func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
-	e, base := file.Split2(path)
-	path, name := file.Split(path)
-	return func(yield func(string, Entry) bool) {
-		if len(e) < 3 {
-			return
-		}
-		for _, ext := range *t {
-			if ext.Name == e {
+	path = file.Clean(path)
+	if path == "." || path == "/" {
+		path = ""
+	}
+
+	ename, path := file.Split2(path)
+	if path == "" {
+		return func(yield func(string, Entry) bool) {
+			for _, ext := range *t {
+				var root string
+				switch {
+				case ext.Name == ename:
+				case strings.HasPrefix(ext.Name, ename):
+					root = ext.Name
+				default:
+					continue
+				}
 				for _, dir := range ext.Dirs {
-					if dir.Path == path {
+					for _, e := range dir.Entries {
+						if !yield(file.Join(root, dir.Path, e.Name), Entry{ext.Name, dir.Path, e}) {
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+
+	pdir := strings.LastIndexByte(path, '/')
+	if pdir < 0 {
+		pdir = 0
+	} else {
+		pdir++
+	}
+	return func(yield func(string, Entry) bool) {
+		for _, ext := range *t {
+			if ext.Name != ename {
+				continue
+			}
+			for _, dir := range ext.Dirs {
+				if dir.Path == path {
+					for _, e := range dir.Entries {
+						if !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+							return
+						}
+					}
+					continue
+				}
+				if strings.HasPrefix(dir.Path, path) {
+					var root string
+					if dir.Path[len(path)] == '/' {
+						root = dir.Path[len(path)+1:]
+					} else {
+						root = dir.Path[pdir:]
+					}
+					for _, e := range dir.Entries {
+						f := e.Name
+						if root != "" {
+							f = file.Join(root, f)
+						}
+						if !yield(f, Entry{ext.Name, dir.Path, e}) {
+							return
+						}
+					}
+					continue
+				}
+				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
+					if pref := path[len(dir.Path)+1:]; pref == "" {
 						for _, e := range dir.Entries {
-							if e.Name == name && !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+							if !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
 								return
 							}
 						}
-					} else if rel, ok := file.Base(dir.Path, base); ok {
+					} else {
 						for _, e := range dir.Entries {
-							if !yield(file.Join(rel, e.Name), Entry{ext.Name, dir.Path, e}) {
+							var root string
+							if e.Name == pref {
+								root = "."
+							} else if strings.HasPrefix(e.Name, pref) {
+								root = e.Name
+							} else {
+								continue
+							}
+							if !yield(root, Entry{ext.Name, dir.Path, e}) {
 								return
 							}
 						}
@@ -309,26 +376,28 @@ func (t *Tree) Store(path string, data []byte) error {
 		return ErrInvalidPath
 	}
 	var ext *Ext
-	for _, ex := range *t {
-		if ex.Name == e {
-			ext = &ex
+	for i := range *t {
+		if ex := &(*t)[i]; ex.Name == e {
+			ext = ex
 			break
 		}
 	}
 	if ext == nil {
-		ext = &Ext{e, nil}
-		*t = append(*t, *ext)
+		n := len(*t)
+		*t = append(*t, Ext{e, nil})
+		ext = &(*t)[n]
 	}
 	var dir *Dir
-	for _, d := range ext.Dirs {
-		if d.Path == path {
-			dir = &d
+	for i := range ext.Dirs {
+		if d := &ext.Dirs[i]; d.Path == path {
+			dir = d
 			break
 		}
 	}
 	if dir == nil {
-		dir = &Dir{path, nil}
-		ext.Dirs = append(ext.Dirs, *dir)
+		n := len(ext.Dirs)
+		ext.Dirs = append(ext.Dirs, Dir{path, nil})
+		dir = &ext.Dirs[n]
 	}
 
 	for _, e := range dir.Entries {

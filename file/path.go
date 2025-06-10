@@ -6,7 +6,11 @@ import (
 )
 
 func Split(path string) (dir, file string) {
-	return filepath.Split(path)
+	dir, file = filepath.Split(path)
+	if end := len(dir) - 1; end >= 0 {
+		dir = dir[:end]
+	}
+	return
 }
 
 func Split2(path string) (string, string) {
@@ -17,7 +21,7 @@ func Split2(path string) (string, string) {
 }
 
 func Join(elem ...string) string {
-	return strings.Join(elem, "/")
+	return filepath.ToSlash(filepath.Join(elem...))
 }
 
 func Clean(path string) string {
