@@ -91,8 +91,10 @@ func (l local) Store(path string, data []byte) (Entry, error) {
 	}
 	path = p
 	dir, _ := filepath.Split(path)
-	if err := os.MkdirAll(dir, 0770); err != nil {
-		return nil, err
+	if dir != "" {
+		if err := os.MkdirAll(dir, 0770); err != nil {
+			return nil, err
+		}
 	}
 	if err := os.WriteFile(path, data, 0660); err != nil {
 		return nil, err

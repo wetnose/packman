@@ -44,8 +44,8 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			for f := range tree.Find("") {
-				fmt.Println(f)
+			for f, e := range tree.Find("") {
+				fmt.Println(f, len(e.GetData()))
 			}
 			return
 		}

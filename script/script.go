@@ -21,8 +21,7 @@ var (
 )
 
 var (
-	patSpace = regexp.MustCompile("\\s+")
-	patPack  = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	patPack = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 )
 
 func errInvalidPack(p string) error {
@@ -179,10 +178,10 @@ func (s *lineParser) parse(no int, line string) (elem []string, err error) {
 			s.buf = append(s.buf, s.TokenText()...)
 		case scanner.String:
 			t, err := strconv.Unquote(s.TokenText())
-			if err == nil {
-				s.buf = append(s.buf, t...)
+			if err != nil {
+				return nil, fmt.Errorf("sytaxt error at %d:%d", no, s.Column)
 			}
-			return nil, fmt.Errorf("sytaxt error at %d:%d", no, s.Column)
+			s.buf = append(s.buf, t...)
 		case ' ', '\t':
 			if len(s.buf) != 0 {
 				elem = append(elem, string(s.buf))
@@ -277,9 +276,11 @@ func (s Script) Run(log func(string, ...any)) {
 			}
 			data := tree.Pack()
 			dir, _ := filepath.Split(p.path)
-			if err := os.MkdirAll(dir, 0770); err != nil {
-				log(err.Error())
-				return
+			if dir != "" {
+				if err := os.MkdirAll(dir, 0770); err != nil {
+					log(err.Error())
+					return
+				}
 			}
 			if err := os.WriteFile(p.path, data, 0660); err != nil {
 				log(err.Error())
