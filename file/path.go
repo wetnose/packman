@@ -21,11 +21,11 @@ func Split2(path string) (string, string) {
 }
 
 func Join(elem ...string) string {
-	return filepath.ToSlash(filepath.Join(elem...))
+	return ToSlash(filepath.Join(elem...))
 }
 
 func Clean(path string) string {
-	return filepath.ToSlash(filepath.Clean(path))
+	return ToSlash(filepath.Clean(path))
 }
 
 func Base(path, base string) (rel string, ok bool) {
@@ -36,6 +36,19 @@ func Base(path, base string) (rel string, ok bool) {
 		}
 	}
 	return
+}
+
+func ToSlash(path string) string {
+	if strings.IndexByte(path, '\\') == -1 {
+		return path
+	}
+	n := []byte(path)
+	for i := range n {
+		if n[i] == '\\' {
+			n[i] = '/'
+		}
+	}
+	return string(n)
 }
 
 //func HasBase(path, base string) bool {

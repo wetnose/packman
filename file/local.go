@@ -33,7 +33,7 @@ func (l local) Find(path string) iter.Seq2[string, Entry] {
 		yieldFile := func(base, f string) bool {
 			if rel, err := filepath.Rel(base, f); err == nil {
 				if data, err := os.ReadFile(f); err == nil {
-					return yield(filepath.ToSlash(rel), entry{filepath.ToSlash(f), data})
+					return yield(ToSlash(rel), entry{ToSlash(f), data})
 				}
 			}
 			return true

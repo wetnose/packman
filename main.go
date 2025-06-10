@@ -1,35 +1,36 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"strings"
-	"vpk/file"
-	"vpk/file/vpk"
+	"packman/script"
 )
 
 func main() {
-	out := vpk.Tree{}
-	in, err := file.LocalTree("file/test")
+	pm := `
+bind A file/vpk/test/local.vpk
+bind D tmp/1/xxx
+copy A:local D:ttt
+`
+	s, err := script.Parse([]byte(pm))
 	if err != nil {
 		log.Fatal(err)
 	}
-	for f, e := range in.Find(".") {
-		if strings.Contains(f, "local") {
-			out.Store(f, e.GetData())
-		}
-	}
-	c := 0
-	for _, ext := range out {
-		fmt.Println(ext.Name)
-		for _, dir := range ext.Dirs {
-			fmt.Println("   ", dir.Path)
-			for _, e := range dir.Entries {
-				c++
-				fmt.Println("      ", c, e.Name, len(e.GetData()))
-			}
-		}
-	}
-	os.WriteFile("file/test/local.vpk", out.Pack(), 0660)
+	s.Run(log.Printf)
+
+	//dst, err := file.LocalTree("tmp/1/xxx")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//src, err := os.ReadFile("tmp/pak01_dir.vpk")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//tree, err := vpk.Parse(buf)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//for e := range tree.List() {
+	//	fmt.Println(e.AbsPath())
+	//}
 }

@@ -4,10 +4,10 @@ import (
 	_ "embed"
 	"github.com/stretchr/testify/assert"
 	"maps"
+	. "packman/test"
 	"slices"
 	"strings"
 	"testing"
-	. "vpk/test"
 )
 
 //go:embed test/local.vpk
@@ -15,6 +15,9 @@ var localVpk []byte
 
 //go:embed test/list-all.txt
 var listAll []byte
+
+//go:embed test/list-dir1.txt
+var listDir1 []byte
 
 func TestClone(t *testing.T) {
 	//out := Tree{}
@@ -37,13 +40,47 @@ func TestClone(t *testing.T) {
 	//	}
 	//}
 	//os.WriteFile("../test/local.vpk", out.Pack(), 0660)
-	pak, err := Parse(localVpk)
+	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
-	files := maps.Collect(pak.Find("/"))
+	files := maps.Collect(tree.Find("/"))
 
 	list := slices.Collect(maps.Keys(files))
 	slices.Sort(list)
 
 	Check(t, assert.Equal(t, string(listAll), strings.Join(list, "\n")))
+}
+
+func TestLocalListDir(t *testing.T) {
+	tree, err := Parse(localVpk)
+	Check(t, assert.NoError(t, err))
+
+	dir1 := slices.Collect(maps.Keys(maps.Collect(tree.Find("local/dir1"))))
+	slices.Sort(dir1)
+	Check(t, assert.Equal(t, string(listDir1), strings.Join(dir1, "\n")))
+
+	dir1c := slices.Collect(maps.Keys(maps.Collect(tree.Find("local/dir1/"))))
+	slices.Sort(dir1c)
+	Check(t, assert.Equal(t, dir1, dir1c))
+}
+
+func TestLocalListPrefix(t *testing.T) {
+	tree, err := Parse(localVpk)
+	Check(t, assert.NoError(t, err))
+
+	dir := maps.Collect(tree.Find("local/dir"))
+	assert.Equal(t, 0, len(dir))
+}
+
+func TestStore(t *testing.T) {
+	tree, err := Parse(localVpk)
+	Check(t, assert.NoError(t, err))
+	Check(t, assert.NoError(t, tree.Store("local/dir3/f1.txt", []byte("data"))))
+	for e := range tree.List() {
+		if e.Ext == "local" && e.Path == "dir3" && e.Name == "f1.txt" {
+			Check(t, assert.Equal(t, "data", string(e.GetData())))
+			return
+		}
+	}
+	t.Fail()
 }

@@ -7,8 +7,9 @@ import (
 	"errors"
 	"hash/crc32"
 	"iter"
+	"os"
+	"packman/file"
 	"strings"
-	"vpk/file"
 )
 
 var (
@@ -120,6 +121,14 @@ func (t *Tree) estimateSecSize() (treeSz int, dataSz int) {
 		}
 	}
 	return
+}
+
+func Read(path string) (Tree, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return Parse(data)
 }
 
 func Parse(vpk []byte) (Tree, error) {

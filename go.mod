@@ -1,4 +1,4 @@
-module vpk
+module packman
 
 go 1.24
 

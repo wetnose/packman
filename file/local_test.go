@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"maps"
 	"os"
+	. "packman/test"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-	. "vpk/test"
 )
 
 //go:embed test/list-all.txt
