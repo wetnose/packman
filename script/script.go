@@ -9,7 +9,9 @@ import (
 	"packman/file/vpk"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"text/scanner"
 	"unicode/utf8"
 )
 
@@ -18,10 +20,17 @@ var (
 	ErrUnsupported = errors.New("unsupported")
 )
 
-var space = regexp.MustCompile("\\s+")
+var (
+	patSpace = regexp.MustCompile("\\s+")
+	patPack  = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+)
+
+func errInvalidPack(p string) error {
+	return fmt.Errorf("invalid binding name %s", p)
+}
 
 func errUnknownPack(p string) error {
-	return fmt.Errorf("unknown pack %s", p)
+	return fmt.Errorf("unknown binding %s", p)
 }
 
 func errIllegalArgCount(cmd string) error {
@@ -150,11 +159,53 @@ func (c *cpy) run(env env) error {
 	return nil
 }
 
+type syntaxErr struct {
+	pos int
+}
+
+type lineParser struct {
+	scanner.Scanner
+	buf []byte
+}
+
+func (s *lineParser) parse(no int, line string) (elem []string, err error) {
+	s.Init(strings.NewReader(line))
+	s.Whitespace = 0
+	s.Mode = scanner.ScanIdents | scanner.ScanStrings
+	s.buf = s.buf[:0]
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		switch tok {
+		case scanner.Ident:
+			s.buf = append(s.buf, s.TokenText()...)
+		case scanner.String:
+			t, err := strconv.Unquote(s.TokenText())
+			if err == nil {
+				s.buf = append(s.buf, t...)
+			}
+			return nil, fmt.Errorf("sytaxt error at %d:%d", no, s.Column)
+		case ' ', '\t':
+			if len(s.buf) != 0 {
+				elem = append(elem, string(s.buf))
+				s.buf = s.buf[:0]
+			}
+		default:
+			s.buf = utf8.AppendRune(s.buf, tok)
+		}
+	}
+	if len(s.buf) != 0 {
+		elem = append(elem, string(s.buf))
+	}
+	return
+}
+
 func Parse(src []byte) (s Script, err error) {
 	if !utf8.Valid(src) {
 		return s, ErrNonScript
 	}
+	var lp lineParser
+	lno := 0
 	for len(src) != 0 {
+		lno++
 		var line string
 		i := bytes.IndexByte(src, '\n')
 		if i < 0 {
@@ -166,11 +217,17 @@ func Parse(src []byte) (s Script, err error) {
 		if len(line) == 0 {
 			continue
 		}
-		elem := space.Split(line, -1)
+		elem, err := lp.parse(lno, line)
+		if err != nil {
+			return s, err
+		}
 		switch cmd := elem[0]; cmd {
 		case "bind":
 			if len(elem) != 3 {
 				return s, errIllegalArgCount(cmd)
+			}
+			if !patPack.MatchString(elem[1]) {
+				return s, errInvalidPack(elem[1])
 			}
 			p, ok := parseRef(filepath.Clean(elem[2]))
 			if !ok {

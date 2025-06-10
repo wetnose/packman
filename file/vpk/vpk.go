@@ -123,12 +123,16 @@ func (t *Tree) estimateSecSize() (treeSz int, dataSz int) {
 	return
 }
 
-func Read(path string) (Tree, error) {
+func Read(path string) (file.Tree, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return Parse(data)
+	tree, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	return &tree, nil
 }
 
 func Parse(vpk []byte) (Tree, error) {
