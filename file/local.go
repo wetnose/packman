@@ -85,7 +85,7 @@ func (l local) Store(path string, data []byte) error {
 	return os.WriteFile(path, data, 0660)
 }
 
-func LocalTree(dir string) (Tree[Entry], error) {
+func LocalTree(dir string) (Tree, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err

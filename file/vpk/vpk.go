@@ -264,23 +264,23 @@ func (t *Tree) List() iter.Seq[Entry] {
 	}
 }
 
-func (t *Tree) FindFirst(path string) *Entry {
+func (t *Tree) FindFirst(path string) *file.Entry {
 	for _, e := range t.Find(path) {
 		return &e
 	}
 	return nil
 }
 
-func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
+func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	path = file.Clean(path)
 	if path == "." || path == "/" {
 		path = ""
 	}
 
 	if path == "" {
-		return func(yield func(string, Entry) bool) {
+		return func(yield func(string, file.Entry) bool) {
 			for e := range t.List() {
-				if !yield(file.Join(e.Ext, e.Path, e.Name), e) {
+				if !yield(file.Join(e.Ext, e.Path, e.Name), &e) {
 					return
 				}
 			}
@@ -300,11 +300,11 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 	}
 
 	if path == "" {
-		return func(yield func(string, Entry) bool) {
+		return func(yield func(string, file.Entry) bool) {
 			for ext := range exts {
 				for _, dir := range ext.Dirs {
 					for _, e := range dir.Entries {
-						if !yield(file.Join(dir.Path, e.Name), Entry{ext.Name, dir.Path, e}) {
+						if !yield(file.Join(dir.Path, e.Name), &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -313,12 +313,12 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 		}
 	}
 
-	return func(yield func(string, Entry) bool) {
+	return func(yield func(string, file.Entry) bool) {
 		for ext := range exts {
 			for _, dir := range ext.Dirs {
 				if dir.Path == path {
 					for _, e := range dir.Entries {
-						if !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+						if !yield(e.Name, &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -330,7 +330,7 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 					}
 					root := dir.Path[len(path)+1:]
 					for _, e := range dir.Entries {
-						if !yield(file.Join(root, e.Name), Entry{ext.Name, dir.Path, e}) {
+						if !yield(file.Join(root, e.Name), &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -339,7 +339,7 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
 					name := path[len(dir.Path)+1:]
 					for _, e := range dir.Entries {
-						if (name == "" || e.Name == name) && !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+						if (name == "" || e.Name == name) && !yield(e.Name, &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}

@@ -2,9 +2,9 @@ package file
 
 import "iter"
 
-type Tree[E Entry] interface {
+type Tree interface {
 	Pack() []byte
-	Find(path string) iter.Seq2[string, E]
+	Find(path string) iter.Seq2[string, Entry]
 	Store(path string, data []byte) error
 }
 

@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"iter"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
-	"vpk/dir"
 	"vpk/file"
-	"vpk/vpk"
+	"vpk/file/vpk"
 )
 
 var (
@@ -44,20 +42,23 @@ func NewEnv(log func(string, ...any)) Env {
 
 type bind struct {
 	name string
-	path []byte
-}
-
-type load struct {
-	name string
 	path string
 }
 
-type save struct {
-	name string
-	path string
-}
+func (l *bind) run(env Env) error {
+	s, err := os.Stat(l.path)
+	if err != nil {
+		return err
+	}
+	if s.IsDir() {
+		loc, err := file.LocalTree(l.path)
+		if err != nil {
+			return err
+		}
+		env.trees[l.name] = loc
+		return nil
+	}
 
-func (l *load) run(env Env) error {
 	buf, err := os.ReadFile(l.path)
 	if err != nil {
 		return err
@@ -66,33 +67,33 @@ func (l *load) run(env Env) error {
 	if err != nil {
 		return err
 	}
-	env.trees[l.name] = tree
+	env.trees[l.name] = &tree
 	return nil
 }
 
-func (s *save) run(env Env) error {
-	tree, ok := env.trees[s.path]
-	if !ok {
-		return fmt.Errorf("pack %s not defined", s.name)
-	}
-	return os.WriteFile(s.path, tree.Pack(), 0660)
-}
+//func (s *save) run(env Env) error {
+//	tree, ok := env.trees[s.path]
+//	if !ok {
+//		return fmt.Errorf("pack %s not defined", s.name)
+//	}
+//	return os.WriteFile(s.path, tree.Pack(), 0660)
+//}
 
 type copy struct {
-	srcTree, dstTree string
-	srcPath, dstPath string
+	src []string
+	dst string
 }
 
 func (c *copy) run(env Env) error {
-	srcTree, ok := env.trees[c.srcTree]
-	if !ok {
-		return fmt.Errorf("pack %s not defined", srcTree)
-	}
-	dstTree, ok := env.trees[c.dstTree]
-	if !ok {
-		return fmt.Errorf("pack %s not defined", dstTree)
-	}
-
+	//srcTree, ok := env.trees[c.srcTree]
+	//if !ok {
+	//	return fmt.Errorf("pack %s not defined", srcTree)
+	//}
+	//dstTree, ok := env.trees[c.dstTree]
+	//if !ok {
+	//	return fmt.Errorf("pack %s not defined", dstTree)
+	//}
+	return nil
 }
 
 func Parse(src []byte) (s Script, err error) {
@@ -113,18 +114,15 @@ func Parse(src []byte) (s Script, err error) {
 		}
 		elem := space.Split(line, -1)
 		switch cmd := elem[0]; cmd {
-		case "save", "load":
+		case "bind":
 			if len(elem) != 3 {
 				return s, fmt.Errorf("illegal argument count of command '%s'", cmd)
 			}
 			p := filepath.Clean(elem[2])
-			if cmd == "load" {
-				s.commands = append(s.commands, &load{elem[1], p})
-			} else {
-				s.commands = append(s.commands, &save{elem[1], p})
-			}
+			s.commands = append(s.commands, &bind{elem[1], p})
 		case "copy":
 
 		}
 	}
+	return s, nil
 }
