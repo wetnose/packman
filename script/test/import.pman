@@ -1,0 +1,3 @@
+bind A .:test/tmp/imp.vpk
+bind D .:test/imp
+copy D: A:local

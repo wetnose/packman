@@ -7,8 +7,8 @@ import (
 
 func main() {
 	pm := `
-bind A file/vpk/test/local.vpk
-bind D tmp/1/xxx
+bind A .:file/vpk/test/local.vpk
+bind D .:tmp/1/xxx
 copy A:local D:ttt
 `
 	s, err := script.Parse([]byte(pm))

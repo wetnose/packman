@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	ErrNonScript = errors.New("not a script")
+	ErrNonScript   = errors.New("not a script")
+	ErrUnsupported = errors.New("unsupported")
 )
 
 var space = regexp.MustCompile("\\s+")
@@ -69,49 +70,56 @@ type env struct {
 
 type bind struct {
 	name string
-	path string
+	ref
 }
 
 func (l *bind) run(env env) error {
-	//env.log("binding %s to %s", l.name, l.path)
-	s, err := os.Stat(l.path)
-	exists := true
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			exists = false
-		} else {
-			return err
-		}
-	}
-	ext := filepath.Ext(l.path)
-	isVpk := strings.EqualFold(ext, "vpk")
-	if !exists && !isVpk || s.IsDir() {
-		loc, err := file.LocalTree(l.path)
+	if l.pack == "." {
+		s, err := os.Stat(l.path)
+		exists := true
 		if err != nil {
-			return err
+			if errors.Is(err, os.ErrNotExist) {
+				exists = false
+			} else {
+				return err
+			}
 		}
-		env.packs[l.name] = &pack{loc, l.path, false}
-		env.log("bound %s as a directory tree (%s)", l.name, l.path)
+		ext := filepath.Ext(l.path)
+		isVpk := strings.EqualFold(ext, ".vpk")
+		if !exists && !isVpk || exists && s.IsDir() {
+			loc, err := file.LocalTree(l.path)
+			if err != nil {
+				return err
+			}
+			env.packs[l.name] = &pack{loc, l.path, false}
+			env.log("bound %s as a directory tree (%s)", l.name, l.path)
+			return nil
+		}
+
+		var tree vpk.Tree
+		if exists {
+			buf, err := os.ReadFile(l.path)
+			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
+			} else {
+				if tree, err = vpk.Parse(buf); err != nil {
+					return err
+				}
+			}
+		}
+
+		env.packs[l.name] = &pack{&tree, l.path, false}
+		env.log("bound %s as VPK (%s)", l.name, l.path)
 		return nil
-	}
-
-	var tree vpk.Tree
-	if exists {
-		buf, err := os.ReadFile(l.path)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return err
-			}
-		} else {
-			if tree, err = vpk.Parse(buf); err != nil {
-				return err
-			}
+	} else {
+		_, ok := env.packs[l.pack]
+		if !ok {
+			return errUnknownPack(l.pack)
 		}
+		return ErrUnsupported
 	}
-
-	env.packs[l.name] = &pack{&tree, l.path, false}
-	env.log("bound %s as VPK (%s)", l.name, l.path)
-	return nil
 }
 
 type cpy struct {
@@ -164,7 +172,10 @@ func Parse(src []byte) (s Script, err error) {
 			if len(elem) != 3 {
 				return s, errIllegalArgCount(cmd)
 			}
-			p := filepath.Clean(elem[2])
+			p, ok := parseRef(filepath.Clean(elem[2]))
+			if !ok {
+				return s, errInvalidRef(elem[2])
+			}
 			s.commands = append(s.commands, &bind{elem[1], p})
 		case "copy":
 			end := len(elem) - 1
