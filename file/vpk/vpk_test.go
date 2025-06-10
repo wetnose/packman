@@ -40,7 +40,7 @@ func TestClone(t *testing.T) {
 	pak, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
-	files := maps.Collect(pak.Find("."))
+	files := maps.Collect(pak.Find("/"))
 
 	list := slices.Collect(maps.Keys(files))
 	slices.Sort(list)

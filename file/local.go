@@ -5,7 +5,6 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type entry struct {
@@ -40,42 +39,21 @@ func (l local) Find(path string) iter.Seq2[string, Entry] {
 			return true
 		}
 
-		yieldDir := func(base, d string) bool {
-			for f := range list(d) {
-				if !yieldFile(base, f) {
-					return false
-				}
-			}
-			return true
-		}
-
 		s, err := os.Stat(path)
 		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return
-			}
-			path, pref := filepath.Split(path)
-			if s, err = os.Stat(path); err != nil || !s.IsDir() {
-				return
-			}
-			l, _ := os.ReadDir(path)
-			for _, e := range l {
-				if !strings.HasPrefix(e.Name(), pref) {
-					continue
-				}
-				f := filepath.Join(path, e.Name())
-				if dir := e.IsDir(); dir && !yieldDir(path, f) || !dir && !yieldFile(path, f) {
-					return
-				}
-			}
 			return
 		}
 
 		if s.IsDir() {
-			yieldDir(path, path)
-			return
+			for f := range list(path) {
+				if !yieldFile(path, f) {
+					return
+				}
+			}
 		}
-		yieldFile(path, path)
+
+		dir, _ := filepath.Split(path)
+		yieldFile(dir, path)
 	}
 }
 

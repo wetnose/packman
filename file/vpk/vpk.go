@@ -277,21 +277,34 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 		path = ""
 	}
 
-	ename, path := file.Split2(path)
 	if path == "" {
 		return func(yield func(string, Entry) bool) {
-			for _, ext := range *t {
-				var root string
-				switch {
-				case ext.Name == ename:
-				case strings.HasPrefix(ext.Name, ename):
-					root = ext.Name
-				default:
-					continue
+			for e := range t.List() {
+				if !yield(file.Join(e.Ext, e.Path, e.Name), e) {
+					return
 				}
+			}
+		}
+	}
+
+	ename, path := file.Split2(path)
+	exts := func(yield func(Ext) bool) {
+		for _, ext := range *t {
+			if ext.Name != ename {
+				continue
+			}
+			if !yield(ext) {
+				return
+			}
+		}
+	}
+
+	if path == "" {
+		return func(yield func(string, Entry) bool) {
+			for ext := range exts {
 				for _, dir := range ext.Dirs {
 					for _, e := range dir.Entries {
-						if !yield(file.Join(root, dir.Path, e.Name), Entry{ext.Name, dir.Path, e}) {
+						if !yield(file.Join(dir.Path, e.Name), Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -300,17 +313,8 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 		}
 	}
 
-	pdir := strings.LastIndexByte(path, '/')
-	if pdir < 0 {
-		pdir = 0
-	} else {
-		pdir++
-	}
 	return func(yield func(string, Entry) bool) {
-		for _, ext := range *t {
-			if ext.Name != ename {
-				continue
-			}
+		for ext := range exts {
 			for _, dir := range ext.Dirs {
 				if dir.Path == path {
 					for _, e := range dir.Entries {
@@ -321,43 +325,22 @@ func (t *Tree) Find(path string) iter.Seq2[string, Entry] {
 					continue
 				}
 				if strings.HasPrefix(dir.Path, path) {
-					var root string
-					if dir.Path[len(path)] == '/' {
-						root = dir.Path[len(path)+1:]
-					} else {
-						root = dir.Path[pdir:]
+					if dir.Path[len(path)] != '/' {
+						continue
 					}
+					root := dir.Path[len(path)+1:]
 					for _, e := range dir.Entries {
-						f := e.Name
-						if root != "" {
-							f = file.Join(root, f)
-						}
-						if !yield(f, Entry{ext.Name, dir.Path, e}) {
+						if !yield(file.Join(root, e.Name), Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
 					continue
 				}
 				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
-					if pref := path[len(dir.Path)+1:]; pref == "" {
-						for _, e := range dir.Entries {
-							if !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
-								return
-							}
-						}
-					} else {
-						for _, e := range dir.Entries {
-							var root string
-							if e.Name == pref {
-								root = "."
-							} else if strings.HasPrefix(e.Name, pref) {
-								root = e.Name
-							} else {
-								continue
-							}
-							if !yield(root, Entry{ext.Name, dir.Path, e}) {
-								return
-							}
+					name := path[len(dir.Path)+1:]
+					for _, e := range dir.Entries {
+						if (name == "" || e.Name == name) && !yield(e.Name, Entry{ext.Name, dir.Path, e}) {
+							return
 						}
 					}
 				}

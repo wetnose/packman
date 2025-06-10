@@ -53,7 +53,7 @@ func TestLocalListDir(t *testing.T) {
 	loc, err := LocalTree("test/local")
 	Check(t, assert.NoError(t, err))
 
-	dir1 := slices.Collect(maps.Keys(maps.Collect(loc.Find("dir1"))))
+	dir1 := slices.Collect(maps.Keys(maps.Collect(loc.Find("dir1/"))))
 	slices.Sort(dir1)
 	Check(t, assert.Equal(t, string(listDir1), strings.Join(dir1, "\n")))
 }
@@ -62,9 +62,8 @@ func TestLocalListPrefix(t *testing.T) {
 	loc, err := LocalTree("test/local")
 	Check(t, assert.NoError(t, err))
 
-	dir := slices.Collect(maps.Keys(maps.Collect(loc.Find("dir"))))
-	slices.Sort(dir)
-	Check(t, assert.Equal(t, string(listPref), strings.Join(dir, "\n")))
+	dir := maps.Collect(loc.Find("dir"))
+	assert.Equal(t, 0, len(dir))
 }
 
 func TestLocalListFile(t *testing.T) {
@@ -73,7 +72,7 @@ func TestLocalListFile(t *testing.T) {
 
 	files := maps.Collect(loc.Find("dir1/dir11/file111.txt"))
 	Check(t, assert.Equal(t, 1, len(files)))
-	e, ok := files["."]
+	e, ok := files["file111.txt"]
 	Check(t, assert.True(t, ok))
 	Check(t, assert.Equal(t, "file111", string(e.GetData())))
 }
