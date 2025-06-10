@@ -5,10 +5,10 @@ import "iter"
 type Tree interface {
 	Pack() []byte
 	Find(path string) iter.Seq2[string, Entry]
-	Store(path string, data []byte) error
+	Store(path string, data []byte) (Entry, error)
 }
 
 type Entry interface {
-	AbsPath() string
+	GetPath() string
 	GetData() []byte
 }

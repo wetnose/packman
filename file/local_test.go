@@ -40,7 +40,7 @@ func TestLocalFindAll(t *testing.T) {
 
 	data := slices.Collect(func(yield func(string) bool) {
 		for e := range maps.Values(files1) {
-			if !yield(fmt.Sprintf("%s:%s", filepath.Base(e.AbsPath()), e.GetData())) {
+			if !yield(fmt.Sprintf("%s:%s", filepath.Base(e.GetPath()), e.GetData())) {
 				return
 			}
 		}

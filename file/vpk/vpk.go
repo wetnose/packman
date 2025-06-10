@@ -259,7 +259,7 @@ type Entry struct {
 	File
 }
 
-func (e Entry) AbsPath() string {
+func (e Entry) GetPath() string {
 	return file.Join(e.Ext, e.Path, e.Name)
 }
 
@@ -362,14 +362,14 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	}
 }
 
-func (t *Tree) Store(path string, data []byte) error {
+func (t *Tree) Store(path string, data []byte) (file.Entry, error) {
 	base, name := file.Split(path)
 	if base == "" {
-		return ErrInvalidPath
+		return nil, ErrInvalidPath
 	}
 	e, path := file.Split2(base)
 	if e == "" || path == "" {
-		return ErrInvalidPath
+		return nil, ErrInvalidPath
 	}
 	var ext *Ext
 	for i := range *t {
@@ -399,10 +399,11 @@ func (t *Tree) Store(path string, data []byte) error {
 	for _, e := range dir.Entries {
 		if e.Name == name {
 			e.SetData(data)
-			return nil
+			return &Entry{ext.Name, dir.Path, e}, nil
 		}
 	}
 
-	dir.Entries = append(dir.Entries, File{name, data, 0})
-	return nil
+	entry := &Entry{ext.Name, dir.Path, File{name, data, 0}}
+	dir.Entries = append(dir.Entries, entry.File)
+	return entry, nil
 }

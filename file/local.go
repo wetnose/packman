@@ -2,9 +2,11 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"iter"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type entry struct {
@@ -12,7 +14,7 @@ type entry struct {
 	data []byte
 }
 
-func (e entry) AbsPath() string {
+func (e entry) GetPath() string {
 	return e.path
 }
 
@@ -27,13 +29,16 @@ func (l local) Pack() []byte {
 }
 
 func (l local) Find(path string) iter.Seq2[string, Entry] {
-	path = filepath.Clean(filepath.Join(string(l), path))
 	return func(yield func(string, Entry) bool) {
+		path, err := filepath.Abs(filepath.Join(string(l), path))
+		if err != nil {
+			return
+		}
 
 		yieldFile := func(base, f string) bool {
 			if rel, err := filepath.Rel(base, f); err == nil {
 				if data, err := os.ReadFile(f); err == nil {
-					return yield(ToSlash(rel), entry{ToSlash(f), data})
+					return yield(ToSlash(rel), entry{Clean(f[len(l)+1:]), data})
 				}
 			}
 			return true
@@ -76,13 +81,23 @@ func list(dir string) iter.Seq[string] {
 	}
 }
 
-func (l local) Store(path string, data []byte) error {
-	path = filepath.Join(string(l), path)
+func (l local) Store(path string, data []byte) (Entry, error) {
+	p, err := filepath.Abs(filepath.Join(string(l), path))
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasPrefix(p, string(l)) || p[len(l)] != filepath.Separator {
+		return nil, fmt.Errorf("invalid file path %s", path)
+	}
+	path = p
 	dir, _ := filepath.Split(path)
 	if err := os.MkdirAll(dir, 0770); err != nil {
-		return err
+		return nil, err
 	}
-	return os.WriteFile(path, data, 0660)
+	if err := os.WriteFile(path, data, 0660); err != nil {
+		return nil, err
+	}
+	return entry{Clean(path[len(l)+1:]), data}, nil
 }
 
 func LocalTree(dir string) (Tree, error) {

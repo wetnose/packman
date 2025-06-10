@@ -148,12 +148,12 @@ func (c *cpy) run(env env) error {
 		}
 		for f, e := range src.tree.Find(s.path) {
 			d := file.Join(c.dst.path, f)
-			env.log("copy %s:%s to %s:%s", s.pack, e.AbsPath(), c.dst.pack, d)
-			err := dst.tree.Store(d, e.GetData())
+			t, err := dst.tree.Store(d, e.GetData())
 			if err != nil {
 				return err
 			}
 			dst.mod = true
+			env.log("copied %s:%s to %s:%s", s.pack, e.GetPath(), c.dst.pack, t.GetPath())
 		}
 	}
 	return nil
