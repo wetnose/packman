@@ -24,20 +24,20 @@ var (
 	patPack = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 )
 
-func errInvalidPack(p string) error {
-	return fmt.Errorf("invalid binding name %s", p)
+func errInvalidPack(lno int, p string) error {
+	return fmt.Errorf("invalid binding name %s at line %d", p, lno)
 }
 
 func errUnknownPack(p string) error {
 	return fmt.Errorf("unknown binding %s", p)
 }
 
-func errIllegalArgCount(cmd string) error {
-	return fmt.Errorf("illegal argument count of command '%s'", cmd)
+func errIllegalArgCount(lno int, cmd string) error {
+	return fmt.Errorf("illegal argument count of command '%s' at line %d", cmd, lno)
 }
 
-func errInvalidRef(ref string) error {
-	return fmt.Errorf("invalid reference '%s'", ref)
+func errInvalidRef(lno int, ref string) error {
+	return fmt.Errorf("invalid reference '%s' at line %d", ref, lno)
 }
 
 type Script struct {
@@ -100,7 +100,7 @@ func (l *bind) run(env env) error {
 				return err
 			}
 			env.packs[l.name] = &pack{loc, l.path, false}
-			env.log("bound %s as a directory tree (%s)", l.name, l.path)
+			env.log("bound %s to a directory tree (%s)", l.name, l.path)
 			return nil
 		}
 
@@ -119,7 +119,7 @@ func (l *bind) run(env env) error {
 		}
 
 		env.packs[l.name] = &pack{&tree, l.path, false}
-		env.log("bound %s as VPK (%s)", l.name, l.path)
+		env.log("bound %s to VPK (%s)", l.name, l.path)
 		return nil
 	} else {
 		_, ok := env.packs[l.pack]
@@ -186,8 +186,14 @@ func (c *clone) run(env env) error {
 
 type empty ref
 
-func (c *empty) run(env env) error {
-	return nil
+func (e *empty) run(env env) error {
+	dst, ok := env.packs[e.pack]
+	if !ok {
+		return errUnknownPack(e.pack)
+	}
+	dst.mod = true
+	env.log("empty %s", ref(*e))
+	return dst.tree.Empty(e.path)
 }
 
 type lineParser struct {
@@ -251,30 +257,39 @@ func Parse(src []byte) (s Script, err error) {
 		switch cmd := elem[0]; cmd {
 		case "bind":
 			if len(elem) != 3 {
-				return s, errIllegalArgCount(cmd)
+				return s, errIllegalArgCount(lno, cmd)
 			}
 			if !patPack.MatchString(elem[1]) {
-				return s, errInvalidPack(elem[1])
+				return s, errInvalidPack(lno, elem[1])
 			}
 			p, ok := parseRef(filepath.Clean(elem[2]))
 			if !ok {
-				return s, errInvalidRef(elem[2])
+				return s, errInvalidRef(lno, elem[2])
 			}
 			s.commands = append(s.commands, &bind{elem[1], p})
+		case "empty":
+			if len(elem) != 2 {
+				return s, errIllegalArgCount(lno, cmd)
+			}
+			p, ok := parseRef(filepath.Clean(elem[1]))
+			if !ok {
+				return s, errInvalidRef(lno, elem[1])
+			}
+			s.commands = append(s.commands, (*empty)(&p))
 		case "copy", "clone":
 			end := len(elem) - 1
 			if end < 2 {
-				return s, errIllegalArgCount(cmd)
+				return s, errIllegalArgCount(lno, cmd)
 			}
 			dst, ok := parseRef(elem[end])
-			if !ok || cmd == "clone" && dst.path != "" {
-				return s, errInvalidRef(elem[end])
+			if !ok || cmd == "clone" && dst.path != "" && dst.path != "." {
+				return s, errInvalidRef(lno, elem[end])
 			}
 			src := make([]ref, end-1)
 			for i, e := range elem[1:end] {
 				r, ok := parseRef(e)
 				if !ok {
-					return s, errInvalidRef(e)
+					return s, errInvalidRef(lno, e)
 				}
 				src[i] = r
 			}

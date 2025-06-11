@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"packman/file"
+	"packman/file/vpk"
 	. "packman/test"
 	"slices"
 	"strings"
@@ -19,6 +20,9 @@ var exportPman []byte
 
 //go:embed test/import.pman
 var importPman []byte
+
+//go:embed test/patch.pman
+var patchPman []byte
 
 //go:embed test/list-exp.txt
 var listExp []byte
@@ -61,4 +65,27 @@ func TestImport(t *testing.T) {
 	Check(t, assert.NoError(t, err))
 
 	assert.Equal(t, exp, act)
+}
+
+func TestPatch(t *testing.T) {
+	patchPath := "test/tmp/patch.vpk"
+	_ = os.RemoveAll(patchPath)
+	_, err := os.Stat(patchPath)
+	Check(t, assert.True(t, errors.Is(err, os.ErrNotExist)))
+
+	s, err := Parse(patchPman)
+	Check(t, assert.NoError(t, err))
+
+	s.Run(log.Printf)
+
+	d, err := vpk.Read(patchPath)
+	Check(t, assert.NoError(t, err))
+
+	var data []string
+	for _, e := range d.Find("") {
+		data = append(data, string(e.GetData()))
+	}
+
+	slices.Sort(data)
+	Check(t, assert.Equal(t, "file11 file12 file22", strings.Join(data, " ")))
 }
