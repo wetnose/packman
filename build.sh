@@ -1,6 +1,10 @@
 ver=$(cat version.txt)
 
-rm -r build
+rm -rf build
+
+set -e
+mkdir build
+
 docker build \
   --no-cache --progress=plain --target=binaries --output=build \
   --build-arg VER=$ver \

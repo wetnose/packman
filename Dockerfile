@@ -6,11 +6,11 @@ WORKDIR /app
 # Copy the source code
 COPY file/ ./file/
 COPY script/ ./script/
-COPY test/ ./test/
 COPY go.mod go.sum *.go ./
 
 # Tests
-RUN go test
+RUN cd file; go test
+RUN cd script; go test
 
 # Build bin (MacOS)
 RUN GOOS=darwin \
