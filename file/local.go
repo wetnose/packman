@@ -15,6 +15,10 @@ type entry struct {
 	path string
 }
 
+func (e entry) String() string {
+	return e.path
+}
+
 func (e entry) GetPath() string {
 	return e.path
 }

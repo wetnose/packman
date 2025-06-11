@@ -281,6 +281,10 @@ func buildPath(dir, name, ext string) string {
 	return fmt.Sprintf("%s/%s.%s", dir, name, ext)
 }
 
+func (e Entry) String() string {
+	return e.GetPath()
+}
+
 func (e Entry) GetPath() string {
 	return buildPath(e.Path, e.Name, e.Ext)
 }

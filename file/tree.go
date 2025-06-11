@@ -11,6 +11,7 @@ type Tree interface {
 }
 
 type Entry interface {
+	String() string
 	GetPath() string
 	GetData() ([]byte, error)
 	GetSize() (int64, error)
