@@ -325,6 +325,12 @@ func (s Script) Run(log func(string, ...any)) {
 			if !ok {
 				continue
 			}
+			if len(*tree) == 0 {
+				if err := os.Remove(p.path); err != nil {
+					log(err.Error())
+					return
+				}
+			}
 			data := tree.Pack()
 			dir, _ := filepath.Split(p.path)
 			if dir != "" {
