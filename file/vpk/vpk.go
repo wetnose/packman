@@ -362,7 +362,7 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	}
 }
 
-func (t *Tree) Empty(path string) error {
+func (t *Tree) Remove(path string) error {
 	path = file.Clean(path)
 	if path == "." || path == "/" || path == "" {
 		*t = (*t)[:0]

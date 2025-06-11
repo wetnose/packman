@@ -184,16 +184,16 @@ func (c *clone) run(env env) error {
 	return nil
 }
 
-type empty ref
+type remove ref
 
-func (e *empty) run(env env) error {
+func (e *remove) run(env env) error {
 	dst, ok := env.packs[e.pack]
 	if !ok {
 		return errUnknownPack(e.pack)
 	}
 	dst.mod = true
-	env.log("empty %s", ref(*e))
-	return dst.tree.Empty(e.path)
+	env.log("remove %s", ref(*e))
+	return dst.tree.Remove(e.path)
 }
 
 type lineParser struct {
@@ -267,7 +267,7 @@ func Parse(src []byte) (s Script, err error) {
 				return s, errInvalidRef(lno, elem[2])
 			}
 			s.commands = append(s.commands, &bind{elem[1], p})
-		case "empty":
+		case "remove":
 			if len(elem) != 2 {
 				return s, errIllegalArgCount(lno, cmd)
 			}
@@ -275,7 +275,7 @@ func Parse(src []byte) (s Script, err error) {
 			if !ok {
 				return s, errInvalidRef(lno, elem[1])
 			}
-			s.commands = append(s.commands, (*empty)(&p))
+			s.commands = append(s.commands, (*remove)(&p))
 		case "copy", "clone":
 			end := len(elem) - 1
 			if end < 2 {
@@ -300,6 +300,8 @@ func Parse(src []byte) (s Script, err error) {
 				c = &cpy{src, dst}
 			}
 			s.commands = append(s.commands, c)
+		default:
+			return s, fmt.Errorf("unknown command %s at line %d", cmd, lno)
 		}
 	}
 	return s, nil

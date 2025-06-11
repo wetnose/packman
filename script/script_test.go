@@ -67,6 +67,11 @@ func TestImport(t *testing.T) {
 	assert.Equal(t, exp, act)
 }
 
+func TestUnknown(t *testing.T) {
+	_, err := Parse([]byte(`check X:`))
+	Check(t, assert.Error(t, err))
+}
+
 func TestPatch(t *testing.T) {
 	patchPath := "test/tmp/patch.vpk"
 	_ = os.RemoveAll(patchPath)

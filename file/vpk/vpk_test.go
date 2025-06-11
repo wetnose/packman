@@ -86,19 +86,19 @@ func TestStore(t *testing.T) {
 	t.Fail()
 }
 
-func TestEmpty(t *testing.T) {
+func TestRemove(t *testing.T) {
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
 	Check(t, assert.Equal(t, "file11 file111 file12 file22", readAll(tree)))
 
-	Check(t, assert.NoError(t, tree.Empty("local/dir1/dir11/file111.txt")))
+	Check(t, assert.NoError(t, tree.Remove("local/dir1/dir11/file111.txt")))
 	Check(t, assert.Equal(t, "file11 file12 file22", readAll(tree)))
 
-	Check(t, assert.NoError(t, tree.Empty("local/dir1")))
+	Check(t, assert.NoError(t, tree.Remove("local/dir1")))
 	Check(t, assert.Equal(t, "file22", readAll(tree)))
 
-	Check(t, assert.NoError(t, tree.Empty("")))
+	Check(t, assert.NoError(t, tree.Remove("")))
 	Check(t, assert.Equal(t, "", readAll(tree)))
 }
 

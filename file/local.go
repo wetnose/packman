@@ -92,38 +92,12 @@ func (l local) abs(path string) (string, error) {
 	return p, nil
 }
 
-func (l local) Empty(path string) (err error) {
+func (l local) Remove(path string) (err error) {
 	path, err = l.abs(path)
 	if err != nil {
 		return err
 	}
-	s, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if s.IsDir() {
-		return emptyDir(path)
-	}
-	return os.Remove(path)
-}
-
-func emptyDir(path string) error {
-	dir, err := os.ReadDir(path)
-	if err != nil {
-		return err
-	}
-	for _, e := range dir {
-		path := filepath.Join(path, e.Name())
-		if e.IsDir() {
-			if err := emptyDir(path); err != nil {
-				return err
-			}
-		}
-		if err = os.Remove(path); err != nil {
-			return err
-		}
-	}
-	return nil
+	return os.RemoveAll(path)
 }
 
 func (l local) Store(path string, data []byte) (e Entry, err error) {

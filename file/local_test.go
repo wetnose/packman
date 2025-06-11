@@ -88,7 +88,7 @@ func TestStore(t *testing.T) {
 	Check(t, assert.Equal(t, "data", string(data)))
 }
 
-func TestEmpty(t *testing.T) {
+func TestRemove(t *testing.T) {
 	_ = os.RemoveAll("test/tmp")
 	Check(t, assert.NoError(t, os.Mkdir("test/tmp", 0770)))
 
@@ -105,13 +105,13 @@ func TestEmpty(t *testing.T) {
 
 	Check(t, assert.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readDir("test/tmp"), " "))
 
-	Check(t, assert.NoError(t, loc.Empty("dir1/dir11/file111.txt")))
+	Check(t, assert.NoError(t, loc.Remove("dir1/dir11/file111.txt")))
 	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", readDir("test/tmp"), " "))
 
-	Check(t, assert.NoError(t, loc.Empty("dir1")))
+	Check(t, assert.NoError(t, loc.Remove("dir1")))
 	Check(t, assert.Equal(t, "file01 file02 file22", readDir("test/tmp"), " "))
 
-	Check(t, assert.NoError(t, loc.Empty("")))
+	Check(t, assert.NoError(t, loc.Remove("")))
 	Check(t, assert.Equal(t, "", readDir("test/tmp"), " "))
 }
 

@@ -1,4 +1,4 @@
-bind T .:test/local.vpk
-bind D .:test/tmp/patch.vpk
-clone T: D:
-empty D:local/dir1/dir11
+bind   T .:test/local.vpk
+bind   D .:test/tmp/patch.vpk
+clone  T: D:
+remove D:local/dir1/dir11
