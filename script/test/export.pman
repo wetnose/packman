@@ -1,3 +1,3 @@
 bind A .:test/local.vpk
 bind D .:test/tmp/1/xxx
-copy A:local D:ttt
+copy A: D:ttt

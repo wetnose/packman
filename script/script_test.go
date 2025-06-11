@@ -39,7 +39,7 @@ func TestExport(t *testing.T) {
 	Check(t, assert.NoError(t, err))
 
 	files := maps.Collect(loc.Find(""))
-	Check(t, assert.Equal(t, 4, len(files)))
+	Check(t, assert.Equal(t, 7, len(files)))
 
 	names := slices.Collect(maps.Keys(files))
 	slices.Sort(names)
@@ -92,5 +92,5 @@ func TestPatch(t *testing.T) {
 	}
 
 	slices.Sort(data)
-	Check(t, assert.Equal(t, "file11 file12 file22", strings.Join(data, " ")))
+	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", strings.Join(data, " ")))
 }

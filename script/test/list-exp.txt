@@ -1,4 +1,7 @@
-1/xxx/ttt/dir1/dir11/file111.txt
+1/xxx/ttt/dir1/dir11/file111.md
+1/xxx/ttt/dir1/dir12/file121.txt
 1/xxx/ttt/dir1/file11.txt
 1/xxx/ttt/dir1/file12.txt
 1/xxx/ttt/dir2/file22.txt
+1/xxx/ttt/file01.txt
+1/xxx/ttt/file02.md

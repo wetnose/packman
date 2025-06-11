@@ -70,9 +70,9 @@ func TestLocalListFile(t *testing.T) {
 	loc, err := LocalTree("test/local")
 	Check(t, assert.NoError(t, err))
 
-	files := maps.Collect(loc.Find("dir1/dir11/file111.txt"))
+	files := maps.Collect(loc.Find("dir1/dir11/file111.md"))
 	Check(t, assert.Equal(t, 1, len(files)))
-	e, ok := files["file111.txt"]
+	e, ok := files["file111.md"]
 	Check(t, assert.True(t, ok))
 	Check(t, assert.Equal(t, "file111", string(e.GetData())))
 }
@@ -105,7 +105,7 @@ func TestRemove(t *testing.T) {
 
 	Check(t, assert.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readDir("test/tmp"), " "))
 
-	Check(t, assert.NoError(t, loc.Remove("dir1/dir11/file111.txt")))
+	Check(t, assert.NoError(t, loc.Remove("dir1/dir11/file111.md")))
 	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", readDir("test/tmp"), " "))
 
 	Check(t, assert.NoError(t, loc.Remove("dir1")))

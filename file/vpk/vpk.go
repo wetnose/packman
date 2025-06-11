@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"iter"
 	"os"
@@ -259,8 +260,25 @@ type Entry struct {
 	File
 }
 
+func buildName(name, ext string) string {
+	if ext == " " {
+		return name
+	}
+	return fmt.Sprintf("%s.%s", name, ext)
+}
+
+func buildPath(dir, name, ext string) string {
+	if dir == "" || dir == " " {
+		return buildName(name, ext)
+	}
+	if ext == " " {
+		return fmt.Sprintf("%s/%s", dir, name)
+	}
+	return fmt.Sprintf("%s/%s.%s", dir, name, ext)
+}
+
 func (e Entry) GetPath() string {
-	return file.Join(e.Ext, e.Path, e.Name)
+	return buildPath(e.Path, e.Name, e.Ext)
 }
 
 func (t *Tree) List() iter.Seq[Entry] {
@@ -284,54 +302,58 @@ func (t *Tree) FindFirst(path string) *file.Entry {
 	return nil
 }
 
-func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
-	path = file.Clean(path)
-	if path == "." || path == "/" {
-		path = ""
+func splitExt(path string) (file string, ext string) {
+	if path != "" && path[len(path)-1] != '"' {
+		for i := len(path) - 1; i > 0 && path[i] != '/'; i-- {
+			if path[i] != '.' {
+				continue
+			}
+			if file, ext = path[:i], path[i+1:]; ext == "" {
+				break
+			}
+			return
+		}
 	}
+	return path, " "
+}
 
-	if path == "" {
+func cleanPath(path string) string {
+	if path = file.Clean(path); path == "" {
+		return ""
+	}
+	if path[0] == '/' {
+		if path = path[1:]; path == "" {
+			return ""
+		}
+	}
+	if end := len(path) - 1; path[end] == '/' {
+		if path = path[:end]; path == "" {
+			return ""
+		}
+	}
+	if path == "." {
+		return ""
+	}
+	return path
+}
+
+func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
+	if path = cleanPath(path); path == "" {
 		return func(yield func(string, file.Entry) bool) {
 			for e := range t.List() {
-				if !yield(file.Join(e.Ext, e.Path, e.Name), &e) {
+				if !yield(e.GetPath(), &e) {
 					return
 				}
 			}
 		}
 	}
 
-	ename, path := file.Split2(path)
-	exts := func(yield func(Ext) bool) {
-		for _, ext := range *t {
-			if ext.Name != ename {
-				continue
-			}
-			if !yield(ext) {
-				return
-			}
-		}
-	}
-
-	if path == "" {
-		return func(yield func(string, file.Entry) bool) {
-			for ext := range exts {
-				for _, dir := range ext.Dirs {
-					for _, e := range dir.Entries {
-						if !yield(file.Join(dir.Path, e.Name), &Entry{ext.Name, dir.Path, e}) {
-							return
-						}
-					}
-				}
-			}
-		}
-	}
-
 	return func(yield func(string, file.Entry) bool) {
-		for ext := range exts {
+		for _, ext := range *t {
 			for _, dir := range ext.Dirs {
 				if dir.Path == path {
 					for _, e := range dir.Entries {
-						if !yield(e.Name, &Entry{ext.Name, dir.Path, e}) {
+						if !yield(buildName(e.Name, ext.Name), &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -343,16 +365,20 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 					}
 					root := dir.Path[len(path)+1:]
 					for _, e := range dir.Entries {
-						if !yield(file.Join(root, e.Name), &Entry{ext.Name, dir.Path, e}) {
+						if !yield(buildPath(root, e.Name, ext.Name), &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
 					continue
 				}
 				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
-					name := path[len(dir.Path)+1:]
+					f := path[len(dir.Path)+1:]
+					name, ename := splitExt(f)
+					if ext.Name != ename {
+						continue
+					}
 					for _, e := range dir.Entries {
-						if (name == "" || e.Name == name) && !yield(e.Name, &Entry{ext.Name, dir.Path, e}) {
+						if e.Name == name && !yield(f, &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -363,33 +389,25 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 }
 
 func (t *Tree) Remove(path string) error {
-	path = file.Clean(path)
-	if path == "." || path == "/" || path == "" {
+	if path = cleanPath(path); path == "" {
 		*t = (*t)[:0]
 		return nil
 	}
 
-	ename, path := file.Split2(path)
-
 	u := (*t)[:0]
 	for _, ext := range *t {
-		if ext.Name == ename {
-			if path == "" {
+		dirs := ext.Dirs[:0]
+		for _, dir := range ext.Dirs {
+			if dir.Path == path {
 				continue
 			}
-			dirs := ext.Dirs[:0]
-			for _, dir := range ext.Dirs {
-				if dir.Path == path {
-					continue
-				}
-				if strings.HasPrefix(dir.Path, path) && dir.Path[len(path)] == '/' {
-					continue
-				}
-				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
-					name := path[len(dir.Path)+1:]
-					if name == "" {
-						continue
-					}
+			if strings.HasPrefix(dir.Path, path) && dir.Path[len(path)] == '/' {
+				continue
+			}
+			if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
+				f := path[len(dir.Path)+1:]
+				name, ename := splitExt(f)
+				if ext.Name == ename {
 					entries := dir.Entries[:0]
 					for _, e := range dir.Entries {
 						if e.Name == name {
@@ -402,13 +420,13 @@ func (t *Tree) Remove(path string) error {
 					}
 					dir.Entries = entries
 				}
-				dirs = append(dirs, dir)
 			}
-			if len(dirs) == 0 {
-				continue
-			}
-			ext.Dirs = dirs
+			dirs = append(dirs, dir)
 		}
+		if len(dirs) == 0 {
+			continue
+		}
+		ext.Dirs = dirs
 		u = append(u, ext)
 	}
 	*t = u
@@ -416,15 +434,15 @@ func (t *Tree) Remove(path string) error {
 }
 
 func (t *Tree) Store(path string, data []byte) (file.Entry, error) {
-	base, name := file.Split(path)
-	if base == "" {
+	var name string
+	if path, name = file.Split(path); name == "" {
 		return nil, ErrInvalidPath
 	}
-	e, path := file.Split2(base)
-	if e == "" || path == "" {
-		return nil, ErrInvalidPath
+	if path == "" {
+		path = " "
 	}
-	entry := t.put(e, path, name, data)
+	name, ext := splitExt(name)
+	entry := t.put(ext, path, name, data)
 	return &entry, nil
 }
 

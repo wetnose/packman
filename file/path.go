@@ -13,13 +13,6 @@ func Split(path string) (dir, file string) {
 	return
 }
 
-func Split2(path string) (string, string) {
-	if i := strings.IndexByte(path, '/'); i >= 0 {
-		return path[:i], path[i+1:]
-	}
-	return path, ""
-}
-
 func Join(elem ...string) string {
 	return ToSlash(filepath.Join(elem...))
 }

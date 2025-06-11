@@ -21,12 +21,11 @@ var listDir1 []byte
 
 func TestClone(t *testing.T) {
 	//out := Tree{}
-	//in, err := file.LocalTree("../test")
+	//in, err := file.LocalTree("../test/local")
 	//Check(t, assert.NoError(t, err))
-	//for f, e := range in.Find(".") {
-	//	if strings.Contains(f, "local") {
-	//		Check(t, assert.NoError(t, out.Store(f, e.GetData())))
-	//	}
+	//for _, e := range in.Find("") {
+	//	_, err := out.Put(e)
+	//	Check(t, assert.NoError(t, err))
 	//}
 	//c := 0
 	//for _, ext := range out {
@@ -39,7 +38,10 @@ func TestClone(t *testing.T) {
 	//		}
 	//	}
 	//}
-	//os.WriteFile("../test/local.vpk", out.Pack(), 0660)
+	//for _, e := range out.Find("") {
+	//	fmt.Println(e.GetPath(), len(e.GetData()))
+	//}
+	//os.WriteFile("test/local.vpk", out.Pack(), 0660)
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
@@ -55,11 +57,11 @@ func TestLocalListDir(t *testing.T) {
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
-	dir1 := slices.Collect(maps.Keys(maps.Collect(tree.Find("local/dir1"))))
+	dir1 := slices.Collect(maps.Keys(maps.Collect(tree.Find("dir1"))))
 	slices.Sort(dir1)
 	Check(t, assert.Equal(t, string(listDir1), strings.Join(dir1, "\n")))
 
-	dir1c := slices.Collect(maps.Keys(maps.Collect(tree.Find("local/dir1/"))))
+	dir1c := slices.Collect(maps.Keys(maps.Collect(tree.Find("dir1/"))))
 	slices.Sort(dir1c)
 	Check(t, assert.Equal(t, dir1, dir1c))
 }
@@ -75,10 +77,10 @@ func TestLocalListPrefix(t *testing.T) {
 func TestStore(t *testing.T) {
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
-	_, err = tree.Store("local/dir3/f1.txt", []byte("data"))
+	_, err = tree.Store("dir3/f1.txt", []byte("data"))
 	Check(t, assert.NoError(t, err))
 	for e := range tree.List() {
-		if e.Ext == "local" && e.Path == "dir3" && e.Name == "f1.txt" {
+		if e.Ext == "txt" && e.Path == "dir3" && e.Name == "f1" {
 			Check(t, assert.Equal(t, "data", string(e.GetData())))
 			return
 		}
@@ -90,13 +92,13 @@ func TestRemove(t *testing.T) {
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
 
-	Check(t, assert.Equal(t, "file11 file111 file12 file22", readAll(tree)))
+	Check(t, assert.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(tree)))
 
-	Check(t, assert.NoError(t, tree.Remove("local/dir1/dir11/file111.txt")))
-	Check(t, assert.Equal(t, "file11 file12 file22", readAll(tree)))
+	Check(t, assert.NoError(t, tree.Remove("dir1/dir11/file111.md")))
+	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(tree)))
 
-	Check(t, assert.NoError(t, tree.Remove("local/dir1")))
-	Check(t, assert.Equal(t, "file22", readAll(tree)))
+	Check(t, assert.NoError(t, tree.Remove("dir1")))
+	Check(t, assert.Equal(t, "file01 file02 file22", readAll(tree)))
 
 	Check(t, assert.NoError(t, tree.Remove("")))
 	Check(t, assert.Equal(t, "", readAll(tree)))
