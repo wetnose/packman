@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 )
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -48,6 +50,12 @@ func main() {
 				fmt.Println(f, len(e.GetData()))
 			}
 			return
+		case "ver", "version":
+			if len(os.Args) != 2 {
+				break
+			}
+			fmt.Println(version)
+			return
 		}
 	}
 
@@ -60,5 +68,6 @@ func main() {
 	fmt.Println()
 	fmt.Println("    run  <path>     run the script")
 	fmt.Println("    list <path>     read file tree")
+	fmt.Println("    version         print app version")
 	os.Exit(1)
 }
