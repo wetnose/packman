@@ -111,3 +111,19 @@ func TestCopyFile(t *testing.T) {
 
 	require.FileExists(t, "test/tmp/dirX/f1.txt")
 }
+
+func TestMem(t *testing.T) {
+	_ = os.RemoveAll("test/tmp")
+	require.NoError(t, os.Mkdir("test/tmp", 0770))
+
+	s, err := Parse([]byte(`
+		bind  A
+		bind  B .:test/local.vpk
+		bind  T .:test/tmp
+        clone B:dir2 A:
+        clone A: T:
+	`))
+	require.NoError(t, err)
+	require.NoError(t, s.Run(log.Printf))
+	require.FileExists(t, "test/tmp/dir2/file22.txt")
+}

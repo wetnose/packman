@@ -386,7 +386,7 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 						continue
 					}
 					for _, e := range dir.Entries {
-						if e.Name == name && !yield(f, &Entry{ext.Name, dir.Path, e}) {
+						if e.Name == name && !yield(".", &Entry{ext.Name, dir.Path, e}) {
 							return
 						}
 					}
@@ -442,6 +442,7 @@ func (t *Tree) Remove(path string) error {
 }
 
 func (t *Tree) Store(path string, data []byte) (file.Entry, error) {
+	path = file.Clean(path)
 	var name string
 	if path, name = file.Split(path); name == "" {
 		return nil, ErrInvalidPath

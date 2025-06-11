@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"packman/file"
+	"packman/file/mem"
 	"packman/file/vpk"
 	"path/filepath"
 	"regexp"
@@ -60,6 +61,8 @@ type ref struct {
 	path string
 }
 
+var noref ref
+
 func (r ref) String() string {
 	return fmt.Sprintf("%s:%s", r.pack, r.path)
 }
@@ -83,10 +86,18 @@ type bind struct {
 }
 
 func (l *bind) String() string {
+	if l.ref == noref {
+		return fmt.Sprintf("bind %s", l.name)
+	}
 	return fmt.Sprintf("bind %s %s", l.name, l.ref)
 }
 
 func (l *bind) run(env env) error {
+	if l.ref == noref {
+		s := make(mem.Store)
+		env.packs[l.name] = &pack{tree: &s}
+		return nil
+	}
 	if l.pack == "." {
 		s, err := os.Stat(l.path)
 		exists := true
@@ -198,7 +209,7 @@ type clone struct {
 
 func (c *clone) String() string {
 	var buf []byte
-	buf = append(buf, "copy"...)
+	buf = append(buf, "clone"...)
 	for _, s := range c.src {
 		buf = append(buf, ' ')
 		buf = append(buf, s.String()...)
@@ -304,17 +315,22 @@ func Parse(src []byte) (s Script, err error) {
 		}
 		switch cmd := elem[0]; cmd {
 		case "bind":
-			if len(elem) != 3 {
+			c := len(elem)
+			if c != 3 && c != 2 {
 				return s, errIllegalArgCount(lno, cmd)
 			}
 			if !patPack.MatchString(elem[1]) {
 				return s, errInvalidPack(lno, elem[1])
 			}
-			p, ok := parseRef(filepath.Clean(elem[2]))
-			if !ok {
-				return s, errInvalidRef(lno, elem[2])
+			if c == 2 {
+				s.commands = append(s.commands, &bind{elem[1], ref{}})
+			} else {
+				p, ok := parseRef(filepath.Clean(elem[2]))
+				if !ok {
+					return s, errInvalidRef(lno, elem[2])
+				}
+				s.commands = append(s.commands, &bind{elem[1], p})
 			}
-			s.commands = append(s.commands, &bind{elem[1], p})
 		case "remove":
 			if len(elem) != 2 {
 				return s, errIllegalArgCount(lno, cmd)

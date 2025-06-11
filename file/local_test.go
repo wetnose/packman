@@ -116,6 +116,14 @@ func TestRemove(t *testing.T) {
 	require.Equal(t, "", readDir("test/tmp"), " ")
 }
 
+func TestLookup(t *testing.T) {
+	loc, err := LocalTree("test/local")
+	require.NoError(t, err)
+
+	file111 := slices.Collect(maps.Keys(maps.Collect(loc.Find("dir1/dir11/file111.md"))))
+	require.Equal(t, []string{"."}, file111)
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Supplementary classes & routines                                                                               //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

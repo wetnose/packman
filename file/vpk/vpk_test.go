@@ -70,7 +70,7 @@ func TestLocalListPrefix(t *testing.T) {
 	tree, err := Parse(localVpk)
 	require.NoError(t, err)
 
-	dir := maps.Collect(tree.Find("local/dir"))
+	dir := maps.Collect(tree.Find("dir"))
 	assert.Equal(t, 0, len(dir))
 }
 
@@ -102,6 +102,14 @@ func TestRemove(t *testing.T) {
 
 	require.NoError(t, tree.Remove(""))
 	require.Equal(t, "", readAll(tree))
+}
+
+func TestLookup(t *testing.T) {
+	tree, err := Parse(localVpk)
+	require.NoError(t, err)
+
+	file111 := slices.Collect(maps.Keys(maps.Collect(tree.Find("dir1/dir11/file111.md"))))
+	require.Equal(t, []string{"."}, file111)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
