@@ -81,15 +81,56 @@ func list(dir string) iter.Seq[string] {
 	}
 }
 
-func (l local) Store(path string, data []byte) (Entry, error) {
+func (l local) abs(path string) (string, error) {
 	p, err := filepath.Abs(filepath.Join(string(l), path))
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(p, string(l)) || len(p) > len(l) && p[len(l)] != filepath.Separator {
+		return "", fmt.Errorf("invalid file path %s", path)
+	}
+	return p, nil
+}
+
+func (l local) Empty(path string) (err error) {
+	path, err = l.abs(path)
+	if err != nil {
+		return err
+	}
+	s, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if s.IsDir() {
+		return emptyDir(path)
+	}
+	return os.Remove(path)
+}
+
+func emptyDir(path string) error {
+	dir, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, e := range dir {
+		path := filepath.Join(path, e.Name())
+		if e.IsDir() {
+			if err := emptyDir(path); err != nil {
+				return err
+			}
+		}
+		if err = os.Remove(path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l local) Store(path string, data []byte) (e Entry, err error) {
+	path, err = l.abs(path)
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(p, string(l)) || p[len(l)] != filepath.Separator {
-		return nil, fmt.Errorf("invalid file path %s", path)
-	}
-	path = p
 	dir, _ := filepath.Split(path)
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0770); err != nil {
@@ -100,6 +141,10 @@ func (l local) Store(path string, data []byte) (Entry, error) {
 		return nil, err
 	}
 	return entry{Clean(path[len(l)+1:]), data}, nil
+}
+
+func (l local) Put(e Entry) (Entry, error) {
+	return l.Store(e.GetPath(), e.GetData())
 }
 
 func LocalTree(dir string) (Tree, error) {

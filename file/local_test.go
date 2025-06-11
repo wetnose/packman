@@ -81,8 +81,65 @@ func TestStore(t *testing.T) {
 	Check(t, assert.NoError(t, os.RemoveAll("test/tmp")))
 	loc, err := LocalTree("test/tmp")
 	Check(t, assert.NoError(t, err))
-	Check(t, assert.NoError(t, loc.Store("dir/f1.txt", []byte("data"))))
+	_, err = loc.Store("dir/f1.txt", []byte("data"))
+	Check(t, assert.NoError(t, err))
 	data, err := os.ReadFile("test/tmp/dir/f1.txt")
 	Check(t, assert.NoError(t, err))
 	Check(t, assert.Equal(t, "data", string(data)))
+}
+
+func TestEmpty(t *testing.T) {
+	_ = os.RemoveAll("test/tmp")
+	Check(t, assert.NoError(t, os.Mkdir("test/tmp", 0770)))
+
+	src, err := LocalTree("test/local")
+	Check(t, assert.NoError(t, err))
+
+	loc, err := LocalTree("test/tmp")
+	Check(t, assert.NoError(t, err))
+
+	for _, e := range src.Find("") {
+		_, err := loc.Put(e)
+		Check(t, assert.NoError(t, err))
+	}
+
+	Check(t, assert.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readDir("test/tmp"), " "))
+
+	Check(t, assert.NoError(t, loc.Empty("dir1/dir11/file111.txt")))
+	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", readDir("test/tmp"), " "))
+
+	Check(t, assert.NoError(t, loc.Empty("dir1")))
+	Check(t, assert.Equal(t, "file01 file02 file22", readDir("test/tmp"), " "))
+
+	Check(t, assert.NoError(t, loc.Empty("")))
+	Check(t, assert.Equal(t, "", readDir("test/tmp"), " "))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Supplementary classes & routines                                                                               //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func readDir(path string) string {
+	data := readFiles(path)
+	slices.Sort(data)
+	return strings.Join(data, " ")
+}
+
+func readFiles(path string) []string {
+	e, _ := os.ReadDir(path)
+	var data []string
+	for _, f := range e {
+		p := filepath.Join(path, f.Name())
+		if f.IsDir() {
+			data = append(data, readFiles(p)...)
+		} else {
+			data = append(data, readFile(p))
+		}
+	}
+	return data
+}
+
+func readFile(path string) string {
+	data, _ := os.ReadFile(path)
+	return string(data)
 }

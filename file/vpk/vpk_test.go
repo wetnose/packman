@@ -75,7 +75,8 @@ func TestLocalListPrefix(t *testing.T) {
 func TestStore(t *testing.T) {
 	tree, err := Parse(localVpk)
 	Check(t, assert.NoError(t, err))
-	Check(t, assert.NoError(t, tree.Store("local/dir3/f1.txt", []byte("data"))))
+	_, err = tree.Store("local/dir3/f1.txt", []byte("data"))
+	Check(t, assert.NoError(t, err))
 	for e := range tree.List() {
 		if e.Ext == "local" && e.Path == "dir3" && e.Name == "f1.txt" {
 			Check(t, assert.Equal(t, "data", string(e.GetData())))
@@ -83,4 +84,33 @@ func TestStore(t *testing.T) {
 		}
 	}
 	t.Fail()
+}
+
+func TestEmpty(t *testing.T) {
+	tree, err := Parse(localVpk)
+	Check(t, assert.NoError(t, err))
+
+	Check(t, assert.Equal(t, "file11 file111 file12 file22", readAll(tree)))
+
+	Check(t, assert.NoError(t, tree.Empty("local/dir1/dir11/file111.txt")))
+	Check(t, assert.Equal(t, "file11 file12 file22", readAll(tree)))
+
+	Check(t, assert.NoError(t, tree.Empty("local/dir1")))
+	Check(t, assert.Equal(t, "file22", readAll(tree)))
+
+	Check(t, assert.NoError(t, tree.Empty("")))
+	Check(t, assert.Equal(t, "", readAll(tree)))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Supplementary classes & routines                                                                               //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func readAll(tree Tree) string {
+	var data []string
+	for _, e := range tree.Find("") {
+		data = append(data, string(e.GetData()))
+	}
+	slices.Sort(data)
+	return strings.Join(data, " ")
 }

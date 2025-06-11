@@ -362,6 +362,59 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	}
 }
 
+func (t *Tree) Empty(path string) error {
+	path = file.Clean(path)
+	if path == "." || path == "/" || path == "" {
+		*t = (*t)[:0]
+		return nil
+	}
+
+	ename, path := file.Split2(path)
+
+	u := (*t)[:0]
+	for _, ext := range *t {
+		if ext.Name == ename {
+			if path == "" {
+				continue
+			}
+			dirs := ext.Dirs[:0]
+			for _, dir := range ext.Dirs {
+				if dir.Path == path {
+					continue
+				}
+				if strings.HasPrefix(dir.Path, path) && dir.Path[len(path)] == '/' {
+					continue
+				}
+				if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
+					name := path[len(dir.Path)+1:]
+					if name == "" {
+						continue
+					}
+					entries := dir.Entries[:0]
+					for _, e := range dir.Entries {
+						if e.Name == name {
+							continue
+						}
+						entries = append(entries, e)
+					}
+					if len(entries) == 0 {
+						continue
+					}
+					dir.Entries = entries
+				}
+				dirs = append(dirs, dir)
+			}
+			if len(dirs) == 0 {
+				continue
+			}
+			ext.Dirs = dirs
+		}
+		u = append(u, ext)
+	}
+	*t = u
+	return nil
+}
+
 func (t *Tree) Store(path string, data []byte) (file.Entry, error) {
 	base, name := file.Split(path)
 	if base == "" {
@@ -371,39 +424,51 @@ func (t *Tree) Store(path string, data []byte) (file.Entry, error) {
 	if e == "" || path == "" {
 		return nil, ErrInvalidPath
 	}
-	var ext *Ext
+	entry := t.put(e, path, name, data)
+	return &entry, nil
+}
+
+func (t *Tree) put(ext, path, file string, data []byte) Entry {
+	var e *Ext
 	for i := range *t {
-		if ex := &(*t)[i]; ex.Name == e {
-			ext = ex
+		if ex := &(*t)[i]; ex.Name == ext {
+			e = ex
 			break
 		}
 	}
-	if ext == nil {
+	if e == nil {
 		n := len(*t)
-		*t = append(*t, Ext{e, nil})
-		ext = &(*t)[n]
+		*t = append(*t, Ext{ext, nil})
+		e = &(*t)[n]
 	}
 	var dir *Dir
-	for i := range ext.Dirs {
-		if d := &ext.Dirs[i]; d.Path == path {
+	for i := range e.Dirs {
+		if d := &e.Dirs[i]; d.Path == path {
 			dir = d
 			break
 		}
 	}
 	if dir == nil {
-		n := len(ext.Dirs)
-		ext.Dirs = append(ext.Dirs, Dir{path, nil})
-		dir = &ext.Dirs[n]
+		n := len(e.Dirs)
+		e.Dirs = append(e.Dirs, Dir{path, nil})
+		dir = &e.Dirs[n]
 	}
 
-	for _, e := range dir.Entries {
-		if e.Name == name {
-			e.SetData(data)
-			return &Entry{ext.Name, dir.Path, e}, nil
+	for _, f := range dir.Entries {
+		if f.Name == file {
+			f.SetData(data)
+			return Entry{ext, path, f}
 		}
 	}
 
-	entry := &Entry{ext.Name, dir.Path, File{name, data, 0}}
+	entry := Entry{ext, path, File{file, data, 0}}
 	dir.Entries = append(dir.Entries, entry.File)
-	return entry, nil
+	return entry
+}
+
+func (t *Tree) Put(e file.Entry) (file.Entry, error) {
+	if te, ok := e.(*Entry); ok {
+		t.put(te.Ext, te.Path, te.Name, te.data)
+	}
+	return t.Store(e.GetPath(), e.GetData())
 }

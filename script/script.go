@@ -158,8 +158,36 @@ func (c *cpy) run(env env) error {
 	return nil
 }
 
-type syntaxErr struct {
-	pos int
+type clone struct {
+	src []ref
+	dst string
+}
+
+func (c *clone) run(env env) error {
+	dst, ok := env.packs[c.dst]
+	if !ok {
+		return errUnknownPack(c.dst)
+	}
+	for _, s := range c.src {
+		src, ok := env.packs[s.pack]
+		if !ok {
+			return errUnknownPack(s.pack)
+		}
+		for _, e := range src.tree.Find(s.path) {
+			if _, err := dst.tree.Put(e); err != nil {
+				return err
+			}
+			dst.mod = true
+		}
+		env.log("cloned %s to %s:", s, c.dst)
+	}
+	return nil
+}
+
+type empty ref
+
+func (c *empty) run(env env) error {
+	return nil
 }
 
 type lineParser struct {
@@ -213,7 +241,7 @@ func Parse(src []byte) (s Script, err error) {
 			line, src = string(src[:i]), src[i+1:]
 		}
 		line = strings.Trim(line, " \t\r")
-		if len(line) == 0 {
+		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
 		elem, err := lp.parse(lno, line)
@@ -233,13 +261,13 @@ func Parse(src []byte) (s Script, err error) {
 				return s, errInvalidRef(elem[2])
 			}
 			s.commands = append(s.commands, &bind{elem[1], p})
-		case "copy":
+		case "copy", "clone":
 			end := len(elem) - 1
 			if end < 2 {
 				return s, errIllegalArgCount(cmd)
 			}
 			dst, ok := parseRef(elem[end])
-			if !ok {
+			if !ok || cmd == "clone" && dst.path != "" {
 				return s, errInvalidRef(elem[end])
 			}
 			src := make([]ref, end-1)
@@ -250,7 +278,13 @@ func Parse(src []byte) (s Script, err error) {
 				}
 				src[i] = r
 			}
-			s.commands = append(s.commands, &cpy{src, dst})
+			var c Command
+			if cmd == "clone" {
+				c = &clone{src, dst.pack}
+			} else {
+				c = &cpy{src, dst}
+			}
+			s.commands = append(s.commands, c)
 		}
 	}
 	return s, nil
