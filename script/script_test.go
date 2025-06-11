@@ -104,7 +104,7 @@ func TestCopyFile(t *testing.T) {
 	s, err := Parse([]byte(`
 		bind A .:test/tmp
 		bind B .:test/local.vpk
-        copy B:dir1/file12.txt A:dirX/f1.txt
+		copy B:dir1/file12.txt A:dirX/f1.txt
 	`))
 	require.NoError(t, err)
 	require.NoError(t, s.Run(log.Printf))
@@ -120,8 +120,8 @@ func TestMem(t *testing.T) {
 		bind  A
 		bind  B .:test/local.vpk
 		bind  T .:test/tmp
-        clone B:dir2 A:
-        clone A: T:
+		clone B:dir2 A:
+		clone A: T:
 	`))
 	require.NoError(t, err)
 	require.NoError(t, s.Run(log.Printf))
