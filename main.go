@@ -27,7 +27,9 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			s.Run(log.Printf)
+			if err = s.Run(log.Printf); err != nil {
+				log.Fatal(err)
+			}
 			return
 		case "list":
 			if len(os.Args) != 3 {
@@ -47,7 +49,11 @@ func main() {
 				log.Fatal(err)
 			}
 			for f, e := range tree.Find("") {
-				fmt.Println(f, len(e.GetData()))
+				if sz, err := e.GetSize(); err == nil {
+					fmt.Println(f, sz)
+				} else {
+					fmt.Println(f)
+				}
 			}
 			return
 		case "ver", "version":

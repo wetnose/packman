@@ -3,6 +3,7 @@ package file
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"iter"
 	"os"
 	"path/filepath"
@@ -10,16 +11,26 @@ import (
 )
 
 type entry struct {
+	local
 	path string
-	data []byte
 }
 
 func (e entry) GetPath() string {
 	return e.path
 }
 
-func (e entry) GetData() []byte {
-	return e.data
+func (e entry) GetData() ([]byte, error) {
+	path := filepath.Join(string(e.local), e.path)
+	return os.ReadFile(path)
+}
+
+func (e entry) GetSize() (int64, error) {
+	path := filepath.Join(string(e.local), e.path)
+	s, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return s.Size(), nil
 }
 
 type local string
@@ -35,49 +46,20 @@ func (l local) Find(path string) iter.Seq2[string, Entry] {
 			return
 		}
 
-		yieldFile := func(base, f string) bool {
-			if rel, err := filepath.Rel(base, f); err == nil {
-				if data, err := os.ReadFile(f); err == nil {
-					return yield(ToSlash(rel), entry{Clean(f[len(l)+1:]), data})
-				}
+		_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
 			}
-			return true
-		}
 
-		s, err := os.Stat(path)
-		if err != nil {
-			return
-		}
-
-		if s.IsDir() {
-			for f := range list(path) {
-				if !yieldFile(path, f) {
-					return
-				}
+			rel, err := filepath.Rel(path, p)
+			if err != nil {
+				return err
 			}
-		}
-
-		dir, _ := filepath.Split(path)
-		yieldFile(dir, path)
-	}
-}
-
-func list(dir string) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		l, _ := os.ReadDir(dir)
-		for _, e := range l {
-			path := filepath.Join(dir, e.Name())
-			if e.IsDir() {
-				for f := range list(path) {
-					if !yield(f) {
-						return
-					}
-				}
+			if !yield(ToSlash(rel), entry{l, Clean(p[len(l)+1:])}) {
+				return filepath.SkipAll
 			}
-			if !yield(path) {
-				return
-			}
-		}
+			return nil
+		})
 	}
 }
 
@@ -114,11 +96,15 @@ func (l local) Store(path string, data []byte) (e Entry, err error) {
 	if err := os.WriteFile(path, data, 0660); err != nil {
 		return nil, err
 	}
-	return entry{Clean(path[len(l)+1:]), data}, nil
+	return entry{l, Clean(path[len(l)+1:])}, nil
 }
 
 func (l local) Put(e Entry) (Entry, error) {
-	return l.Store(e.GetPath(), e.GetData())
+	data, err := e.GetData()
+	if err != nil {
+		return nil, err
+	}
+	return l.Store(e.GetPath(), data)
 }
 
 func LocalTree(dir string) (Tree, error) {

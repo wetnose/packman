@@ -3,8 +3,8 @@ package vpk
 import (
 	_ "embed"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"maps"
-	. "packman/test"
 	"slices"
 	"strings"
 	"testing"
@@ -43,32 +43,32 @@ func TestClone(t *testing.T) {
 	//}
 	//os.WriteFile("test/local.vpk", out.Pack(), 0660)
 	tree, err := Parse(localVpk)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	files := maps.Collect(tree.Find("/"))
 
 	list := slices.Collect(maps.Keys(files))
 	slices.Sort(list)
 
-	Check(t, assert.Equal(t, string(listAll), strings.Join(list, "\n")))
+	require.Equal(t, string(listAll), strings.Join(list, "\n"))
 }
 
 func TestLocalListDir(t *testing.T) {
 	tree, err := Parse(localVpk)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	dir1 := slices.Collect(maps.Keys(maps.Collect(tree.Find("dir1"))))
 	slices.Sort(dir1)
-	Check(t, assert.Equal(t, string(listDir1), strings.Join(dir1, "\n")))
+	require.Equal(t, string(listDir1), strings.Join(dir1, "\n"))
 
 	dir1c := slices.Collect(maps.Keys(maps.Collect(tree.Find("dir1/"))))
 	slices.Sort(dir1c)
-	Check(t, assert.Equal(t, dir1, dir1c))
+	require.Equal(t, dir1, dir1c)
 }
 
 func TestLocalListPrefix(t *testing.T) {
 	tree, err := Parse(localVpk)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	dir := maps.Collect(tree.Find("local/dir"))
 	assert.Equal(t, 0, len(dir))
@@ -76,12 +76,12 @@ func TestLocalListPrefix(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	tree, err := Parse(localVpk)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 	_, err = tree.Store("dir3/f1.txt", []byte("data"))
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 	for e := range tree.List() {
 		if e.Ext == "txt" && e.Path == "dir3" && e.Name == "f1" {
-			Check(t, assert.Equal(t, "data", string(e.GetData())))
+			require.Equal(t, "data", string(e.data))
 			return
 		}
 	}
@@ -90,18 +90,18 @@ func TestStore(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	tree, err := Parse(localVpk)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
-	Check(t, assert.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(tree)))
+	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(tree))
 
-	Check(t, assert.NoError(t, tree.Remove("dir1/dir11/file111.md")))
-	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(tree)))
+	require.NoError(t, tree.Remove("dir1/dir11/file111.md"))
+	require.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(tree))
 
-	Check(t, assert.NoError(t, tree.Remove("dir1")))
-	Check(t, assert.Equal(t, "file01 file02 file22", readAll(tree)))
+	require.NoError(t, tree.Remove("dir1"))
+	require.Equal(t, "file01 file02 file22", readAll(tree))
 
-	Check(t, assert.NoError(t, tree.Remove("")))
-	Check(t, assert.Equal(t, "", readAll(tree)))
+	require.NoError(t, tree.Remove(""))
+	require.Equal(t, "", readAll(tree))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +111,7 @@ func TestRemove(t *testing.T) {
 func readAll(tree Tree) string {
 	var data []string
 	for _, e := range tree.Find("") {
-		data = append(data, string(e.GetData()))
+		data = append(data, string(e.(*Entry).data))
 	}
 	slices.Sort(data)
 	return strings.Join(data, " ")

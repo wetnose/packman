@@ -4,12 +4,12 @@ import (
 	_ "embed"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"log"
 	"maps"
 	"os"
 	"packman/file"
 	"packman/file/vpk"
-	. "packman/test"
 	"slices"
 	"strings"
 	"testing"
@@ -29,17 +29,17 @@ var listExp []byte
 
 func TestExport(t *testing.T) {
 	_ = os.RemoveAll("test/tmp")
-	Check(t, assert.NoError(t, os.Mkdir("test/tmp", 0770)))
+	require.NoError(t, os.Mkdir("test/tmp", 0770))
 
 	s, err := Parse(exportPman)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	s.Run(log.Printf)
 	loc, err := file.LocalTree("test/tmp")
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	files := maps.Collect(loc.Find(""))
-	Check(t, assert.Equal(t, 7, len(files)))
+	require.Equal(t, 7, len(files))
 
 	names := slices.Collect(maps.Keys(files))
 	slices.Sort(names)
@@ -51,46 +51,63 @@ func TestImport(t *testing.T) {
 	impPath := "test/tmp/imp.vpk"
 	_ = os.RemoveAll(impPath)
 	_, err := os.Stat(impPath)
-	Check(t, assert.True(t, errors.Is(err, os.ErrNotExist)))
+	require.True(t, errors.Is(err, os.ErrNotExist))
 
 	s, err := Parse(importPman)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	s.Run(log.Printf)
 
 	exp, err := os.ReadFile("test/local.vpk")
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	act, err := os.ReadFile(impPath)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	assert.Equal(t, exp, act)
 }
 
 func TestUnknown(t *testing.T) {
 	_, err := Parse([]byte(`check X:`))
-	Check(t, assert.Error(t, err))
+	require.Error(t, err)
 }
 
 func TestPatch(t *testing.T) {
 	patchPath := "test/tmp/patch.vpk"
 	_ = os.RemoveAll(patchPath)
 	_, err := os.Stat(patchPath)
-	Check(t, assert.True(t, errors.Is(err, os.ErrNotExist)))
+	require.True(t, errors.Is(err, os.ErrNotExist))
 
 	s, err := Parse(patchPman)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	s.Run(log.Printf)
 
 	d, err := vpk.Read(patchPath)
-	Check(t, assert.NoError(t, err))
+	require.NoError(t, err)
 
 	var data []string
 	for _, e := range d.Find("") {
-		data = append(data, string(e.GetData()))
+		buf, err := e.GetData()
+		require.NoError(t, err)
+		data = append(data, string(buf))
 	}
 
 	slices.Sort(data)
-	Check(t, assert.Equal(t, "file01 file02 file11 file12 file121 file22", strings.Join(data, " ")))
+	require.Equal(t, "file01 file02 file11 file12 file121 file22", strings.Join(data, " "))
+}
+
+func TestCopyFile(t *testing.T) {
+	_ = os.RemoveAll("test/tmp")
+	require.NoError(t, os.Mkdir("test/tmp", 0770))
+
+	s, err := Parse([]byte(`
+		bind A .:test/tmp
+		bind B .:test/local.vpk
+        copy B:dir1/file12.txt A:dirX/f1.txt
+	`))
+	require.NoError(t, err)
+	require.NoError(t, s.Run(log.Printf))
+
+	require.FileExists(t, "test/tmp/dirX/f1.txt")
 }

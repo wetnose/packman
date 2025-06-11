@@ -46,6 +46,7 @@ type Script struct {
 
 type Command interface {
 	run(env env) error
+	String() string
 }
 
 type pack struct {
@@ -81,6 +82,10 @@ type bind struct {
 	ref
 }
 
+func (l *bind) String() string {
+	return fmt.Sprintf("bind %s %s", l.name, l.ref)
+}
+
 func (l *bind) run(env env) error {
 	if l.pack == "." {
 		s, err := os.Stat(l.path)
@@ -100,7 +105,6 @@ func (l *bind) run(env env) error {
 				return err
 			}
 			env.packs[l.name] = &pack{loc, l.path, false}
-			env.log("bound %s to a directory tree (%s)", l.name, l.path)
 			return nil
 		}
 
@@ -119,7 +123,6 @@ func (l *bind) run(env env) error {
 		}
 
 		env.packs[l.name] = &pack{&tree, l.path, false}
-		env.log("bound %s to VPK (%s)", l.name, l.path)
 		return nil
 	} else {
 		_, ok := env.packs[l.pack]
@@ -135,24 +138,54 @@ type cpy struct {
 	dst ref
 }
 
+func (c *cpy) String() string {
+	var buf []byte
+	buf = append(buf, "copy"...)
+	for _, s := range c.src {
+		buf = append(buf, ' ')
+		buf = append(buf, s.String()...)
+	}
+	buf = append(buf, ' ')
+	buf = append(buf, c.dst.String()...)
+	return string(buf)
+}
+
 func (c *cpy) run(env env) error {
 	dst, ok := env.packs[c.dst.pack]
 	if !ok {
 		return errUnknownPack(c.dst.pack)
 	}
+
+	store := func(path string, data []byte) error {
+		if _, err := dst.tree.Store(path, data); err != nil {
+			return err
+		}
+		dst.mod = true
+		return nil
+	}
+
+	first := len(c.src) == 1
 	for _, s := range c.src {
 		src, ok := env.packs[s.pack]
 		if !ok {
 			return errUnknownPack(s.pack)
 		}
 		for f, e := range src.tree.Find(s.path) {
-			d := file.Join(c.dst.path, f)
-			t, err := dst.tree.Store(d, e.GetData())
+			buf, err := e.GetData()
 			if err != nil {
 				return err
 			}
-			dst.mod = true
-			env.log("copied %s:%s to %s:%s", s.pack, e.GetPath(), c.dst.pack, t.GetPath())
+			if first {
+				first = false
+				if e.GetPath() == s.path {
+					if p := c.dst.path; p != "" && p[len(p)-1] != '/' {
+						return store(p, buf)
+					}
+				}
+			}
+			if err = store(file.Join(c.dst.path, f), buf); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -161,6 +194,19 @@ func (c *cpy) run(env env) error {
 type clone struct {
 	src []ref
 	dst string
+}
+
+func (c *clone) String() string {
+	var buf []byte
+	buf = append(buf, "copy"...)
+	for _, s := range c.src {
+		buf = append(buf, ' ')
+		buf = append(buf, s.String()...)
+	}
+	buf = append(buf, ' ')
+	buf = append(buf, c.dst...)
+	buf = append(buf, ':')
+	return string(buf)
 }
 
 func (c *clone) run(env env) error {
@@ -179,12 +225,15 @@ func (c *clone) run(env env) error {
 			}
 			dst.mod = true
 		}
-		env.log("cloned %s to %s:", s, c.dst)
 	}
 	return nil
 }
 
 type remove ref
+
+func (e *remove) String() string {
+	return fmt.Sprintf("remove %s", *e)
+}
 
 func (e *remove) run(env env) error {
 	dst, ok := env.packs[e.pack]
@@ -192,7 +241,6 @@ func (e *remove) run(env env) error {
 		return errUnknownPack(e.pack)
 	}
 	dst.mod = true
-	env.log("remove %s", ref(*e))
 	return dst.tree.Remove(e.path)
 }
 
@@ -307,16 +355,16 @@ func Parse(src []byte) (s Script, err error) {
 	return s, nil
 }
 
-func (s Script) Run(log func(string, ...any)) {
+func (s Script) Run(log func(string, ...any)) error {
 	if log == nil {
 		log = func(s string, a ...any) {
 		}
 	}
 	env := env{make(map[string]*pack), log}
 	for _, c := range s.commands {
+		log("%s", c)
 		if err := c.run(env); err != nil {
-			log(err.Error())
-			return
+			return err
 		}
 	}
 	for _, p := range env.packs {
@@ -327,22 +375,20 @@ func (s Script) Run(log func(string, ...any)) {
 			}
 			if len(*tree) == 0 {
 				if err := os.Remove(p.path); err != nil {
-					log(err.Error())
-					return
+					return err
 				}
 			}
 			data := tree.Pack()
 			dir, _ := filepath.Split(p.path)
 			if dir != "" {
 				if err := os.MkdirAll(dir, 0770); err != nil {
-					log(err.Error())
-					return
+					return err
 				}
 			}
 			if err := os.WriteFile(p.path, data, 0660); err != nil {
-				log(err.Error())
-				return
+				return err
 			}
 		}
 	}
+	return nil
 }

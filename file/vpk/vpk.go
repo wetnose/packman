@@ -43,8 +43,12 @@ type File struct {
 	crc  uint32
 }
 
-func (f *File) GetData() []byte {
-	return f.data
+func (f *File) GetSize() (int64, error) {
+	return int64(len(f.data)), nil
+}
+
+func (f *File) GetData() ([]byte, error) {
+	return f.data, nil
 }
 
 func (f *File) SetData(data []byte) {
@@ -488,5 +492,9 @@ func (t *Tree) Put(e file.Entry) (file.Entry, error) {
 	if te, ok := e.(*Entry); ok {
 		t.put(te.Ext, te.Path, te.Name, te.data)
 	}
-	return t.Store(e.GetPath(), e.GetData())
+	data, err := e.GetData()
+	if err != nil {
+		return nil, err
+	}
+	return t.Store(e.GetPath(), data)
 }
