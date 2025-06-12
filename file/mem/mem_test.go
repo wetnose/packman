@@ -42,6 +42,33 @@ func TestRemove(t *testing.T) {
 	require.Equal(t, "", readAll(s))
 }
 
+func TestRemoveWithListener(t *testing.T) {
+	s := prepareStore()
+
+	rem := []string{}
+	ln := func() func(string) {
+		rem = rem[:0]
+		return func(path string) {
+			rem = append(rem, path)
+			slices.Sort(rem)
+		}
+	}
+
+	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(s))
+
+	require.NoError(t, s.Remove("dir1/dir11/file111.md", ln()))
+	require.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(s))
+	require.Equal(t, "dir1/dir11/file111.md", strings.Join(rem, " "))
+
+	require.NoError(t, s.Remove("dir1", ln()))
+	require.Equal(t, "file01 file02 file22", readAll(s))
+	require.Equal(t, "dir1/dir12/file121.txt dir1/file11.txt dir1/file12.txt", strings.Join(rem, " "))
+
+	require.NoError(t, s.Remove("", ln()))
+	require.Equal(t, "", readAll(s))
+	require.Equal(t, "dir2/file22.txt file01.txt file02.md", strings.Join(rem, " "))
+}
+
 func TestStore(t *testing.T) {
 	s := make(Store)
 

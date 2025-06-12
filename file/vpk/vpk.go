@@ -423,7 +423,23 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 
 func (t *Tree) Remove(path string, ln func(path string)) error {
 	if path = cleanPath(path); path == "" {
-		*t = (*t)[:0]
+		if ln == nil {
+			*t = (*t)[:0]
+			return nil
+		}
+		for i := len(*t) - 1; i >= 0; i-- {
+			ext := &(*t)[i]
+			for j := len(ext.Dirs) - 1; j >= 0; j-- {
+				dir := &ext.Dirs[j]
+				for k := len(dir.Entries) - 1; k >= 0; k-- {
+					e := dir.Entries[k]
+					dir.Entries = dir.Entries[:k]
+					ln(Entry{ext.Name, dir.Path, e}.GetPath())
+				}
+				ext.Dirs = ext.Dirs[:j]
+			}
+			*t = (*t)[:i]
+		}
 		return nil
 	}
 

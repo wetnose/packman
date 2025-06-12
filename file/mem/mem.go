@@ -80,7 +80,14 @@ func (s *Store) Find(path string) iter.Seq2[string, file.Entry] {
 
 func (s *Store) Remove(path string, ln func(path string)) error {
 	if path = cleanPath(path); path == "" {
-		clear(*s)
+		if ln != nil {
+			for p := range *s {
+				delete(*s, p)
+				ln(p)
+			}
+		} else {
+			clear(*s)
+		}
 		return nil
 	}
 	if _, ok := (*s)[path]; ok {

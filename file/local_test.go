@@ -116,6 +116,45 @@ func TestRemove(t *testing.T) {
 	require.Equal(t, "", readDir("test/tmp"), " ")
 }
 
+func TestRemoveWithListener(t *testing.T) {
+	_ = os.RemoveAll("test/tmp")
+	require.NoError(t, os.Mkdir("test/tmp", 0770))
+
+	src, err := LocalTree("test/local")
+	require.NoError(t, err)
+
+	loc, err := LocalTree("test/tmp")
+	require.NoError(t, err)
+
+	for _, e := range src.Find("") {
+		_, err := loc.Put(e)
+		require.NoError(t, err)
+	}
+
+	rem := []string{}
+	ln := func() func(string) {
+		rem = rem[:0]
+		return func(path string) {
+			rem = append(rem, path)
+			slices.Sort(rem)
+		}
+	}
+
+	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readDir("test/tmp"), " ")
+
+	require.NoError(t, loc.Remove("dir1/dir11/file111.md", ln()))
+	require.Equal(t, "file01 file02 file11 file12 file121 file22", readDir("test/tmp"), " ")
+	require.Equal(t, "dir1/dir11/file111.md", strings.Join(rem, " "))
+
+	require.NoError(t, loc.Remove("dir1", ln()))
+	require.Equal(t, "file01 file02 file22", readDir("test/tmp"), " ")
+	require.Equal(t, "dir1/dir12/file121.txt dir1/file11.txt dir1/file12.txt", strings.Join(rem, " "))
+
+	require.NoError(t, loc.Remove("", ln()))
+	require.Equal(t, "", readDir("test/tmp"), " ")
+	require.Equal(t, "dir2/file22.txt file01.txt file02.md", strings.Join(rem, " "))
+}
+
 func TestLookup(t *testing.T) {
 	loc, err := LocalTree("test/local")
 	require.NoError(t, err)

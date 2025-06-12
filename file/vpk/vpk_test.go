@@ -104,6 +104,34 @@ func TestRemove(t *testing.T) {
 	require.Equal(t, "", readAll(tree))
 }
 
+func TestRemoveWithListener(t *testing.T) {
+	tree, err := Parse(localVpk)
+	require.NoError(t, err)
+
+	rem := []string{}
+	ln := func() func(string) {
+		rem = rem[:0]
+		return func(path string) {
+			rem = append(rem, path)
+			slices.Sort(rem)
+		}
+	}
+
+	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(tree))
+
+	require.NoError(t, tree.Remove("dir1/dir11/file111.md", ln()))
+	require.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(tree))
+	require.Equal(t, "dir1/dir11/file111.md", strings.Join(rem, " "))
+
+	require.NoError(t, tree.Remove("dir1", ln()))
+	require.Equal(t, "file01 file02 file22", readAll(tree))
+	require.Equal(t, "dir1/dir12/file121.txt dir1/file11.txt dir1/file12.txt", strings.Join(rem, " "))
+
+	require.NoError(t, tree.Remove("", ln()))
+	require.Equal(t, "", readAll(tree))
+	require.Equal(t, "dir2/file22.txt file01.txt file02.md", strings.Join(rem, " "))
+}
+
 func TestLookup(t *testing.T) {
 	tree, err := Parse(localVpk)
 	require.NoError(t, err)
