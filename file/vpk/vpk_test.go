@@ -94,13 +94,13 @@ func TestRemove(t *testing.T) {
 
 	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(tree))
 
-	require.NoError(t, tree.Remove("dir1/dir11/file111.md"))
+	require.NoError(t, tree.Remove("dir1/dir11/file111.md", nil))
 	require.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(tree))
 
-	require.NoError(t, tree.Remove("dir1"))
+	require.NoError(t, tree.Remove("dir1", nil))
 	require.Equal(t, "file01 file02 file22", readAll(tree))
 
-	require.NoError(t, tree.Remove(""))
+	require.NoError(t, tree.Remove("", nil))
 	require.Equal(t, "", readAll(tree))
 }
 

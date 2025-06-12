@@ -34,7 +34,7 @@ func TestExport(t *testing.T) {
 	s, err := Parse(exportPman)
 	require.NoError(t, err)
 
-	s.Run(log.Printf)
+	require.NoError(t, s.Run(log.Printf))
 	loc, err := file.LocalTree("test/tmp")
 	require.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestImport(t *testing.T) {
 	s, err := Parse(importPman)
 	require.NoError(t, err)
 
-	s.Run(log.Printf)
+	require.NoError(t, s.Run(log.Printf))
 
 	exp, err := os.ReadFile("test/local.vpk")
 	require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestPatch(t *testing.T) {
 	s, err := Parse(patchPman)
 	require.NoError(t, err)
 
-	s.Run(log.Printf)
+	require.NoError(t, s.Run(log.Printf))
 
 	d, err := vpk.Read(patchPath)
 	require.NoError(t, err)

@@ -1,7 +1,9 @@
 package mem
 
 import (
+	"errors"
 	"iter"
+	"os"
 	"packman/file"
 	"strings"
 )
@@ -29,12 +31,29 @@ func (e *entry) GetSize() (int64, error) {
 
 type Store map[string]*entry
 
-func (s *Store) Pack() []byte {
-	return nil
+func (s *Store) Pack() ([]byte, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func cleanPath(path string) string {
+	if path = file.Clean(path); path == "/" || path == "" || path == "." {
+		return ""
+	}
+	return path
+}
+
+func (s *Store) Get(path string) (file.Entry, error) {
+	if path = cleanPath(path); path == "" {
+		return nil, os.ErrInvalid
+	}
+	if e, ok := (*s)[path]; ok {
+		return e, nil
+	}
+	return nil, os.ErrNotExist
 }
 
 func (s *Store) Find(path string) iter.Seq2[string, file.Entry] {
-	if path = file.Clean(path); path == "/" || path == "" || path == "." {
+	if path = cleanPath(path); path == "" {
 		return func(yield func(string, file.Entry) bool) {
 			for p, e := range *s {
 				if !yield(p, e) {
@@ -59,25 +78,33 @@ func (s *Store) Find(path string) iter.Seq2[string, file.Entry] {
 	}
 }
 
-func (s *Store) Remove(path string) error {
-	if path = file.Clean(path); path == "/" || path == "" || path == "." {
+func (s *Store) Remove(path string, ln func(path string)) error {
+	if path = cleanPath(path); path == "" {
 		clear(*s)
 		return nil
 	}
 	if _, ok := (*s)[path]; ok {
 		delete(*s, path)
+		if ln != nil {
+			ln(path)
+		}
 		return nil
 	}
 	for p := range *s {
 		if strings.HasPrefix(p, path) && p[len(path)] == '/' {
 			delete(*s, p)
+			if ln != nil {
+				ln(p)
+			}
 		}
 	}
 	return nil
 }
 
 func (s *Store) Store(path string, data []byte) (file.Entry, error) {
-	path = file.Clean(path)
+	if path = cleanPath(path); path == "" {
+		return nil, os.ErrInvalid
+	}
 	return s.store(path, data), nil
 }
 

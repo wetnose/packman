@@ -32,13 +32,13 @@ func TestRemove(t *testing.T) {
 	s := prepareStore()
 	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readAll(s))
 
-	require.NoError(t, s.Remove("dir1/dir11/file111.md"))
+	require.NoError(t, s.Remove("dir1/dir11/file111.md", nil))
 	require.Equal(t, "file01 file02 file11 file12 file121 file22", readAll(s))
 
-	require.NoError(t, s.Remove("dir1"))
+	require.NoError(t, s.Remove("dir1", nil))
 	require.Equal(t, "file01 file02 file22", readAll(s))
 
-	require.NoError(t, s.Remove(""))
+	require.NoError(t, s.Remove("", nil))
 	require.Equal(t, "", readAll(s))
 }
 

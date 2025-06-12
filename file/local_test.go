@@ -106,13 +106,13 @@ func TestRemove(t *testing.T) {
 
 	require.Equal(t, "file01 file02 file11 file111 file12 file121 file22", readDir("test/tmp"), " ")
 
-	require.NoError(t, loc.Remove("dir1/dir11/file111.md"))
+	require.NoError(t, loc.Remove("dir1/dir11/file111.md", nil))
 	require.Equal(t, "file01 file02 file11 file12 file121 file22", readDir("test/tmp"), " ")
 
-	require.NoError(t, loc.Remove("dir1"))
+	require.NoError(t, loc.Remove("dir1", nil))
 	require.Equal(t, "file01 file02 file22", readDir("test/tmp"), " ")
 
-	require.NoError(t, loc.Remove(""))
+	require.NoError(t, loc.Remove("", nil))
 	require.Equal(t, "", readDir("test/tmp"), " ")
 }
 

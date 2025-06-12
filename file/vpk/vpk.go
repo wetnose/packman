@@ -56,7 +56,7 @@ func (f *File) SetData(data []byte) {
 	f.data = data
 }
 
-func (t *Tree) Pack() []byte {
+func (t *Tree) Pack() ([]byte, error) {
 	treeSz, dataSz := t.estimateSecSize()
 	// header v2 + tree + data + checksums
 	vpk := make([]byte, 28+treeSz+dataSz+48)
@@ -109,7 +109,7 @@ func (t *Tree) Pack() []byte {
 	copy(sums, sum(tree))
 	copy(sums[16:], sum([]byte{}))
 	copy(sums[32:], sum(vpk[:len(vpk)-16]))
-	return vpk
+	return vpk, nil
 }
 
 func (t *Tree) estimateSecSize() (treeSz int, dataSz int) {
@@ -345,6 +345,31 @@ func cleanPath(path string) string {
 	return path
 }
 
+func (t *Tree) Get(path string) (file.Entry, error) {
+	path = cleanPath(path)
+	dir, f := file.Split(path)
+	if dir == "" {
+		dir = " "
+	}
+	name, ename := splitExt(f)
+	for _, ext := range *t {
+		if ext.Name != ename {
+			continue
+		}
+		for _, p := range ext.Dirs {
+			if p.Path != dir {
+				continue
+			}
+			for _, e := range p.Entries {
+				if e.Name == name {
+					return &Entry{ename, dir, e}, nil
+				}
+			}
+		}
+	}
+	return nil, os.ErrNotExist
+}
+
 func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	if path = cleanPath(path); path == "" {
 		return func(yield func(string, file.Entry) bool) {
@@ -396,20 +421,24 @@ func (t *Tree) Find(path string) iter.Seq2[string, file.Entry] {
 	}
 }
 
-func (t *Tree) Remove(path string) error {
+func (t *Tree) Remove(path string, ln func(path string)) error {
 	if path = cleanPath(path); path == "" {
 		*t = (*t)[:0]
 		return nil
 	}
 
 	u := (*t)[:0]
+	var removed []string
 	for _, ext := range *t {
 		dirs := ext.Dirs[:0]
 		for _, dir := range ext.Dirs {
-			if dir.Path == path {
-				continue
-			}
-			if strings.HasPrefix(dir.Path, path) && dir.Path[len(path)] == '/' {
+			if dir.Path == path || strings.HasPrefix(dir.Path, path) && dir.Path[len(path)] == '/' {
+				// remove the dir
+				if ln != nil {
+					for _, e := range dir.Entries {
+						removed = append(removed, Entry{ext.Name, dir.Path, e}.GetPath())
+					}
+				}
 				continue
 			}
 			if strings.HasPrefix(path, dir.Path) && path[len(dir.Path)] == '/' {
@@ -419,6 +448,9 @@ func (t *Tree) Remove(path string) error {
 					entries := dir.Entries[:0]
 					for _, e := range dir.Entries {
 						if e.Name == name {
+							if ln != nil {
+								removed = append(removed, path)
+							}
 							continue
 						}
 						entries = append(entries, e)
@@ -438,6 +470,11 @@ func (t *Tree) Remove(path string) error {
 		u = append(u, ext)
 	}
 	*t = u
+	if len(removed) != 0 {
+		for _, p := range removed {
+			ln(p)
+		}
+	}
 	return nil
 }
 

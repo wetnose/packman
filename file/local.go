@@ -39,13 +39,28 @@ func (e entry) GetSize() (int64, error) {
 
 type local string
 
-func (l local) Pack() []byte {
-	panic(errors.ErrUnsupported)
+func (l local) Pack() ([]byte, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (l local) Get(path string) (Entry, error) {
+	path, err := l.abs(path)
+	if err != nil {
+		return nil, err
+	}
+	s, err := os.Stat(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if s.IsDir() {
+		return nil, os.ErrInvalid
+	}
+	return &entry{l, path[len(l)+1:]}, nil
 }
 
 func (l local) Find(path string) iter.Seq2[string, Entry] {
 	return func(yield func(string, Entry) bool) {
-		path, err := filepath.Abs(filepath.Join(string(l), path))
+		path, err := l.abs(path)
 		if err != nil {
 			return
 		}
@@ -78,12 +93,45 @@ func (l local) abs(path string) (string, error) {
 	return p, nil
 }
 
-func (l local) Remove(path string) (err error) {
+func (l local) Remove(path string, ln func(path string)) (err error) {
 	path, err = l.abs(path)
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(path)
+	s, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	return l.remove(path, s.IsDir(), ln)
+}
+
+func (l local) removeDir(path string, ln func(path string)) error {
+	dir, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, e := range dir {
+		path := filepath.Join(path, e.Name())
+		if err := l.remove(path, e.IsDir(), ln); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l local) remove(path string, dir bool, ln func(path string)) error {
+	if dir {
+		if err := l.removeDir(path, ln); err != nil {
+			return err
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	if ln != nil && !dir {
+		ln(path[len(l)+1:])
+	}
+	return nil
 }
 
 func (l local) Store(path string, data []byte) (e Entry, err error) {
@@ -104,11 +152,7 @@ func (l local) Store(path string, data []byte) (e Entry, err error) {
 }
 
 func (l local) Put(e Entry) (Entry, error) {
-	data, err := e.GetData()
-	if err != nil {
-		return nil, err
-	}
-	return l.Store(e.GetPath(), data)
+	return Store(l, e)
 }
 
 func LocalTree(dir string) (Tree, error) {

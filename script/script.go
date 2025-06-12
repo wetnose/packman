@@ -252,7 +252,7 @@ func (e *remove) run(env env) error {
 		return errUnknownPack(e.pack)
 	}
 	dst.mod = true
-	return dst.tree.Remove(e.path)
+	return dst.tree.Remove(e.path, nil)
 }
 
 type lineParser struct {
@@ -394,7 +394,10 @@ func (s Script) Run(log func(string, ...any)) error {
 					return err
 				}
 			}
-			data := tree.Pack()
+			data, err := tree.Pack()
+			if err != nil {
+				return err
+			}
 			dir, _ := filepath.Split(p.path)
 			if dir != "" {
 				if err := os.MkdirAll(dir, 0770); err != nil {

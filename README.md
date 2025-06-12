@@ -1,2 +1,2 @@
 # packman
-Packet Manager
+Pack Manager
