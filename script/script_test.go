@@ -135,7 +135,7 @@ func TestRegex(t *testing.T) {
 	s, err := Parse([]byte(`
 		bind  B .:test/local.vpk
 		bind  T .:test/tmp
-		clone -e B:file1 T:
+		clone -e -v B:file1 T:
 	`))
 	require.NoError(t, err)
 	require.NoError(t, s.Run(log.Printf))

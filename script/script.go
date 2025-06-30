@@ -207,7 +207,8 @@ func (c *cpy) run(env env) error {
 }
 
 const (
-	fRegex = 1
+	fRegex = 1 << iota
+	fVerbose
 )
 
 type clone struct {
@@ -237,6 +238,7 @@ func (c *clone) run(env env) error {
 	if !ok {
 		return errUnknownPack(c.dst)
 	}
+	v := c.flags&fVerbose != 0
 	for _, s := range c.src {
 		src, ok := env.packs[s.pack]
 		if !ok {
@@ -248,11 +250,15 @@ func (c *clone) run(env env) error {
 				return err
 			}
 			for _, e := range src.tree.Find(".") {
-				if r.FindString(e.GetPath()) == "" {
+				p := e.GetPath()
+				if r.FindString(p) == "" {
 					continue
 				}
 				if _, err := dst.tree.Put(e); err != nil {
 					return err
+				}
+				if v {
+					env.log("| %s", p)
 				}
 				dst.mod = true
 			}
@@ -260,6 +266,9 @@ func (c *clone) run(env env) error {
 			for _, e := range src.tree.Find(s.path) {
 				if _, err := dst.tree.Put(e); err != nil {
 					return err
+				}
+				if v {
+					env.log("| %s", e.GetPath())
 				}
 				dst.mod = true
 			}
@@ -374,11 +383,18 @@ func Parse(src []byte) (s Script, err error) {
 				return s, errIllegalArgCount(lno, cmd)
 			}
 			flags := 0
-			if args[0] == "-e" {
+			for end != 0 && args[0][0] == '-' {
 				if cmd != "clone" {
 					return s, errUnknownFlag(lno, args[0])
 				}
-				flags |= fRegex
+				switch args[0] {
+				case "-e":
+					flags |= fRegex
+				case "-v":
+					flags |= fVerbose
+				default:
+					return s, errUnknownFlag(lno, args[0])
+				}
 				args, end = args[1:], end-1
 			}
 			if end == 0 {
