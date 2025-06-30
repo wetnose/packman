@@ -127,3 +127,17 @@ func TestMem(t *testing.T) {
 	require.NoError(t, s.Run(log.Printf))
 	require.FileExists(t, "test/tmp/dir2/file22.txt")
 }
+
+func TestRegex(t *testing.T) {
+	_ = os.RemoveAll("test/tmp")
+	require.NoError(t, os.Mkdir("test/tmp", 0770))
+
+	s, err := Parse([]byte(`
+		bind  B .:test/local.vpk
+		bind  T .:test/tmp
+		clone -e B:file1 T:
+	`))
+	require.NoError(t, err)
+	require.NoError(t, s.Run(log.Printf))
+	//require.FileExists(t, "test/tmp/dir2/file22.txt")
+}

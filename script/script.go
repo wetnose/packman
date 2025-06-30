@@ -41,6 +41,10 @@ func errInvalidRef(lno int, ref string) error {
 	return fmt.Errorf("invalid reference '%s' at line %d", ref, lno)
 }
 
+func errUnknownFlag(lno int, flag string) error {
+	return fmt.Errorf("unknown flag '%s' at line %d", flag, lno)
+}
+
 type Script struct {
 	commands []Command
 }
@@ -202,14 +206,22 @@ func (c *cpy) run(env env) error {
 	return nil
 }
 
+const (
+	fRegex = 1
+)
+
 type clone struct {
-	src []ref
-	dst string
+	src   []ref
+	dst   string
+	flags int
 }
 
 func (c *clone) String() string {
 	var buf []byte
 	buf = append(buf, "clone"...)
+	if c.flags&fRegex != 0 {
+		buf = append(buf, " -e"...)
+	}
 	for _, s := range c.src {
 		buf = append(buf, ' ')
 		buf = append(buf, s.String()...)
@@ -230,11 +242,27 @@ func (c *clone) run(env env) error {
 		if !ok {
 			return errUnknownPack(s.pack)
 		}
-		for _, e := range src.tree.Find(s.path) {
-			if _, err := dst.tree.Put(e); err != nil {
+		if c.flags&fRegex != 0 {
+			r, err := regexp.Compile(s.path)
+			if err != nil {
 				return err
 			}
-			dst.mod = true
+			for _, e := range src.tree.Find(".") {
+				if r.FindString(e.GetPath()) == "" {
+					continue
+				}
+				if _, err := dst.tree.Put(e); err != nil {
+					return err
+				}
+				dst.mod = true
+			}
+		} else {
+			for _, e := range src.tree.Find(s.path) {
+				if _, err := dst.tree.Put(e); err != nil {
+					return err
+				}
+				dst.mod = true
+			}
 		}
 	}
 	return nil
@@ -313,44 +341,55 @@ func Parse(src []byte) (s Script, err error) {
 		if err != nil {
 			return s, err
 		}
-		switch cmd := elem[0]; cmd {
+		switch cmd, args := elem[0], elem[1:]; cmd {
 		case "bind":
-			c := len(elem)
-			if c != 3 && c != 2 {
+			c := len(args)
+			if c != 1 && c != 2 {
 				return s, errIllegalArgCount(lno, cmd)
 			}
-			if !patPack.MatchString(elem[1]) {
-				return s, errInvalidPack(lno, elem[1])
+			if !patPack.MatchString(args[0]) {
+				return s, errInvalidPack(lno, args[0])
 			}
-			if c == 2 {
-				s.commands = append(s.commands, &bind{elem[1], ref{}})
+			if c == 1 {
+				s.commands = append(s.commands, &bind{args[0], ref{}})
 			} else {
-				p, ok := parseRef(filepath.Clean(elem[2]))
+				p, ok := parseRef(filepath.Clean(args[1]))
 				if !ok {
-					return s, errInvalidRef(lno, elem[2])
+					return s, errInvalidRef(lno, args[1])
 				}
-				s.commands = append(s.commands, &bind{elem[1], p})
+				s.commands = append(s.commands, &bind{args[0], p})
 			}
 		case "remove":
-			if len(elem) != 2 {
+			if len(args) != 1 {
 				return s, errIllegalArgCount(lno, cmd)
 			}
-			p, ok := parseRef(filepath.Clean(elem[1]))
+			p, ok := parseRef(filepath.Clean(args[0]))
 			if !ok {
-				return s, errInvalidRef(lno, elem[1])
+				return s, errInvalidRef(lno, args[0])
 			}
 			s.commands = append(s.commands, (*remove)(&p))
 		case "copy", "clone":
-			end := len(elem) - 1
-			if end < 2 {
+			end := len(args) - 1
+			if end < 1 {
 				return s, errIllegalArgCount(lno, cmd)
 			}
-			dst, ok := parseRef(elem[end])
-			if !ok || cmd == "clone" && dst.path != "" && dst.path != "." {
-				return s, errInvalidRef(lno, elem[end])
+			flags := 0
+			if args[0] == "-e" {
+				if cmd != "clone" {
+					return s, errUnknownFlag(lno, args[0])
+				}
+				flags |= fRegex
+				args, end = args[1:], end-1
 			}
-			src := make([]ref, end-1)
-			for i, e := range elem[1:end] {
+			if end == 0 {
+				return s, errIllegalArgCount(lno, cmd)
+			}
+			dst, ok := parseRef(args[end])
+			if !ok || cmd == "clone" && dst.path != "" && dst.path != "." {
+				return s, errInvalidRef(lno, args[end])
+			}
+			src := make([]ref, end)
+			for i, e := range args[:end] {
 				r, ok := parseRef(e)
 				if !ok {
 					return s, errInvalidRef(lno, e)
@@ -359,7 +398,7 @@ func Parse(src []byte) (s Script, err error) {
 			}
 			var c Command
 			if cmd == "clone" {
-				c = &clone{src, dst.pack}
+				c = &clone{src, dst.pack, flags}
 			} else {
 				c = &cpy{src, dst}
 			}
